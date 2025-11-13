@@ -1,4 +1,5 @@
 #include <iostream>
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include <chrono>
 #include "gwo_serial.hpp"
@@ -13,6 +14,17 @@ struct SphereProblem : public GWO::Problem<double>
     }
 };
 
+struct RastriginProblem : public GWO::Problem<double>
+{
+    using GWO::Problem<double>::Problem;
+
+    double fitness(const Eigen::ArrayXd &pos) const override {
+        const double A = 10.0;
+        const double two_pi = 2.0 * M_PI;
+        return A * pos.size() + (pos.square() - A * (two_pi * pos).cos()).sum();
+    }
+};
+
 int main() {
     GWO::Setup setup;
     setup.N = 100;                
@@ -20,21 +32,17 @@ int main() {
     setup.maxRange = Eigen::ArrayXd::Constant(setup.N, 10.0);
     setup.minRange = Eigen::ArrayXd::Constant(setup.N, -10.0);
 
-    // Seed để cấu hình kết quả
+    // Seed để cố định giá trị
     GWO::rng.state = 123456789ULL;  
 
-    SphereProblem problem(setup);
+    RastriginProblem problem(setup);
 
     auto start = std::chrono::steady_clock::now();
-    auto best = problem.run(1000);  // 1000 vòng lặp
+    auto best = problem.run(1000);  
     auto end = std::chrono::steady_clock::now();
 
     long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-    std::cout << "=== Grey Wolf Optimization (Serial) ===\n";
-    std::cout << "Dimensions: " << setup.N << "\n";
-    std::cout << "Population: " << setup.POP_SIZE << "\n";
-    std::cout << "Iterations: 1000\n";
     std::cout << "Time: " << ms << " ms\n";
     std::cout << "Best fitness: " << best.savedFitness << "\n";
     std::cout << "Best position (first 5 dims): [";

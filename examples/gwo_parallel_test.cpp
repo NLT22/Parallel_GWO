@@ -1,4 +1,5 @@
 #include <iostream>
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include <chrono>
 #include "gwo_parallel.hpp"
@@ -14,18 +15,25 @@ struct SphereProblem : public GWO::Problem<double>
     }
 };
 
+struct RastriginProblem : public GWO::Problem<double>
+{
+    using GWO::Problem<double>::Problem;
+
+    double fitness(const Eigen::ArrayXd &pos) const override {
+        const double A = 10.0;
+        const double two_pi = 2.0 * M_PI;
+        return A * pos.size() + (pos.square() - A * (two_pi * pos).cos()).sum();
+    }
+};
+
 int main() {
-
-    // -----------------------------
-    // CẤU HÌNH BÀI TOÁN LỚN
-    // -----------------------------
     GWO::Setup setup;
-    setup.N = 1000;
-    setup.POP_SIZE = 5000;
-    setup.maxRange = Eigen::ArrayXd::Constant(setup.N, 100.0);
-    setup.minRange = Eigen::ArrayXd::Constant(setup.N, -100.0);
+    setup.N = 100;
+    setup.POP_SIZE = 500;
+    setup.maxRange = Eigen::ArrayXd::Constant(setup.N, 10.0);
+    setup.minRange = Eigen::ArrayXd::Constant(setup.N, -10.0);
 
-    // Danh sách số luồng cần test
+    
     int thread_tests[] = {1, 2, 4, 8, 16, 20};
     int num_tests = sizeof(thread_tests) / sizeof(thread_tests[0]);
 
@@ -39,9 +47,6 @@ int main() {
               << ", POP = " << setup.POP_SIZE 
               << ", Iter = 1000\n\n";
 
-    // -----------------------------
-    // QUÉT QUA CÁC MỨC SỐ LUỒNG
-    // -----------------------------
     for (int i = 0; i < num_tests; i++)
     {
         int threads = thread_tests[i];
@@ -56,10 +61,10 @@ int main() {
         omp_set_num_threads(threads);
 #endif
 
-        // Cố định seed để kết quả giống nhau giữa các lần chạy
+        // Seed để cố định giá trị
         GWO::global_seed  = 123456789ULL;
 
-        SphereProblem problem(setup);
+        RastriginProblem problem(setup);
 
         auto start = std::chrono::steady_clock::now();
         auto best = problem.run(1000);
