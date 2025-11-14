@@ -6,7 +6,7 @@
 #include <filesystem>
 #include "gwo_parallel.hpp"
 
-// g++ -O2 -std=c++20 -fopenmp -I "..\eigen-5.0.0" gwo_parallel_test.cpp -o parallel_test.exe
+// g++ -O2 -std=c++20 -fopenmp -I "../eigen-5.0.0" gwo_parallel_test.cpp -o parallel_test.exe
 
 struct SphereProblem : public GWO::Problem<double>
 {
@@ -27,14 +27,14 @@ struct RastriginProblem : public GWO::Problem<double>
 };
 
 int main() {
-    std::vector<int> N_list = {10, 30, 50, 100};
+    std::vector<int> N_list = {10, 50, 100, 500, 1000};
     std::vector<int> Pop_list = {50, 100, 200, 500, 1000
                                 // , 2000, 5000, 10000, 20000
                                 // , 50000, 100000
                                 };
-    std::vector<int> thread_list = {1, 2, 4, 8, 16, 20};
+    std::vector<int> thread_list = {2, 4, 8, 16, 20};
 
-    const int RUNS = 10;
+    const int RUNS = 5;
     std::string problem_name = "Rastrigin";
     std::string filename = "gwo_parallel.csv";
 
