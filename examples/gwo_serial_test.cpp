@@ -29,72 +29,81 @@ struct RastriginProblem : public GWO::Problem<double>
 };
 
 int main() {
-    GWO::Setup setup;
-    setup.N = 10;                
-    setup.POP_SIZE = 100;         
-    setup.maxRange = Eigen::ArrayXd::Constant(setup.N, 5);
-    setup.minRange = Eigen::ArrayXd::Constant(setup.N, -5);
-
-    // Số lần chạy 
-    const int RUNS = 10;
-
-    long long total_ms = 0;
-    double best_fitness_last_run = 0.0;
+    std::vector<int> N_list = {10, 30, 50, 100};
+    std::vector<int> Pop_list = {50, 100, 200, 500, 1000
+                                // , 2000, 5000, 10000, 20000
+                                // , 50000, 100000
+                                };
+    const int RUNS = 10; // Số lần chạy để lấy thời gian trung bình
     std::string problem_name = "Rastrigin";
-
-    for (int r = 1; r <= RUNS; r++)
-    {
-        GWO::rng.state = 123456789ULL;  
-
-        RastriginProblem problem(setup);
-
-        auto start = std::chrono::steady_clock::now();
-
-        // GWO tuần tự
-        auto best = problem.run(1000);  
-
-        // PCC-GWO -> kết quả không khả quan :v
-        // auto best = GWO::run_pccgwo(problem, 1000, 4);
-
-        auto end = std::chrono::steady_clock::now();
-
-        long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-        total_ms += ms;
-        best_fitness_last_run = best.savedFitness;   // lưu lại fitness lần cuối
-
-        std::cout << "Run " << r << ": " << ms << " ms"
-                  << " | best fitness = " << best.savedFitness << "\n";
-    }
-
-    double avg = total_ms / double(RUNS);
-
-    std::cout << "-----------------------------------\n";
-    std::cout << "Average time over " << RUNS << " runs: " << avg << " ms\n";
-
     std::string filename = "gwo_serial.csv";
+    
+    GWO::Setup setup;
+    
+    for (int N : N_list) {
+        for (int POP_SIZE : Pop_list) {
+            std::cout<<"================================";
+            std::cout<<"\nN=" << N << ", POP_SIZE=" << POP_SIZE << "\n";
+            setup.N = N;                
+            setup.POP_SIZE = POP_SIZE;         
+            setup.maxRange = Eigen::ArrayXd::Constant(setup.N, 5);
+            setup.minRange = Eigen::ArrayXd::Constant(setup.N, -5);
 
-    bool need_header = (!std::filesystem::exists(filename) ||
-                        std::filesystem::file_size(filename) == 0);
+            long long total_ms = 0;
+            double best_fitness_last_run = 0.0;            
 
-    std::ofstream csv(filename, std::ios::app);
+            for (int r = 1; r <= RUNS; r++)
+            {
+                GWO::rng.state = 123456789ULL;  
 
-    if (!csv) {
-        std::cerr << "Cannot open gwo_results.csv for writing!\n";
-        return 1;
+                RastriginProblem problem(setup);
+
+                auto start = std::chrono::steady_clock::now();
+
+                // GWO tuần tự
+                auto best = problem.run(1000);  
+
+                // PCC-GWO -> kết quả không khả quan :v
+                // auto best = GWO::run_pccgwo(problem, 1000, 4);
+
+                auto end = std::chrono::steady_clock::now();
+
+                long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+                total_ms += ms;
+                best_fitness_last_run = best.savedFitness;   // lưu lại fitness lần cuối
+
+                std::cout << "Run " << r << ": " << ms << " ms"
+                        << " | best fitness = " << best.savedFitness << "\n";
+            }
+
+            double avg = total_ms / double(RUNS);
+
+            std::cout << "-----------------------------------\n";
+            std::cout << "Average time over " << RUNS << " runs: " << avg << " ms\n";
+
+            bool need_header = (!std::filesystem::exists(filename) ||
+                                std::filesystem::file_size(filename) == 0);
+
+            std::ofstream csv(filename, std::ios::app);
+
+            if (!csv) {
+                std::cerr << "Cannot open gwo_results.csv for writing!\n";
+                return 1;
+            }
+
+            if (need_header) {
+                csv << "problem,N,POP_SIZE,avg_ms,best_fitness_last_run\n";
+            }
+
+            csv << problem_name
+                << "," << setup.N
+                << "," << setup.POP_SIZE
+                << "," << avg
+                << "," << best_fitness_last_run
+                << "\n";
+
+            csv.close();
+        }
     }
-
-    if (need_header) {
-        csv << "problem,N,POP_SIZE,avg_ms,best_fitness_last_run\n";
-    }
-
-    csv << problem_name
-        << "," << setup.N
-        << "," << setup.POP_SIZE
-        << "," << avg
-        << "," << best_fitness_last_run
-        << "\n";
-
-    csv.close();
-
     return 0;
 }

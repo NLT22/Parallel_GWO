@@ -27,79 +27,85 @@ struct RastriginProblem : public GWO::Problem<double>
 };
 
 int main() {
-    GWO::Setup setup;
-    setup.N = 10;
-    setup.POP_SIZE = 100;
-    setup.maxRange = Eigen::ArrayXd::Constant(setup.N, 5);
-    setup.minRange = Eigen::ArrayXd::Constant(setup.N, -5);
+    std::vector<int> N_list = {10, 30, 50, 100};
+    std::vector<int> Pop_list = {50, 100, 200, 500, 1000
+                                // , 2000, 5000, 10000, 20000
+                                // , 50000, 100000
+                                };
+    std::vector<int> thread_list = {1, 2, 4, 8, 16, 20};
 
     const int RUNS = 10;
     std::string problem_name = "Rastrigin";
-
-    std::vector<int> thread_list = {1, 2, 4, 8, 16, 20};
-
     std::string filename = "gwo_parallel.csv";
-    bool need_header = (!std::filesystem::exists(filename) ||
-                        std::filesystem::file_size(filename) == 0);
 
-    std::ofstream csv(filename, std::ios::app);
-    if (!csv) {
-        std::cerr << "Cannot open gwo_parallel.csv\n";
-        return 1;
-    }
+    GWO::Setup setup;
+    for (int N : N_list) {
+        for (int POP_SIZE : Pop_list) {
+            setup.N = N;
+            setup.POP_SIZE = POP_SIZE;
+            setup.maxRange = Eigen::ArrayXd::Constant(setup.N, 5);
+            setup.minRange = Eigen::ArrayXd::Constant(setup.N, -5);
+            bool need_header = (!std::filesystem::exists(filename) ||
+                                std::filesystem::file_size(filename) == 0);
 
-    if (need_header) {
-        csv << "problem,N,POP_SIZE,threads,avg_ms,best_fitness_last_run\n";
-    }
+            std::ofstream csv(filename, std::ios::app);
+            if (!csv) {
+                std::cerr << "Cannot open gwo_parallel.csv\n";
+                return 1;
+            }
 
-    for (int threads : thread_list)
-    {
-        #ifdef _OPENMP
-        omp_set_num_threads(threads);
-        #endif
+            if (need_header) {
+                csv << "problem,N,POP_SIZE,threads,avg_ms,best_fitness_last_run\n";
+            }
 
-        long long total_ms = 0;
-        double best_fitness_last_run = 0.0;
+            for (int threads : thread_list)
+            {
+                #ifdef _OPENMP
+                omp_set_num_threads(threads);
+                #endif
 
+                long long total_ms = 0;
+                double best_fitness_last_run = 0.0;
 
-        std::cout << "\n===========Testing threads = " << threads << "===========\n";
+                std::cout<<"================================";
+                std::cout<<"\nN=" << N << ", POP_SIZE=" << POP_SIZE << ", Threads = "<<threads<<"\n";
 
-        for (int r = 1; r <= RUNS; r++)
-        {
-            GWO::global_seed = 123456789ULL;
+                for (int r = 1; r <= RUNS; r++)
+                {
+                    GWO::global_seed = 123456789ULL;
 
-            RastriginProblem problem(setup);
+                    RastriginProblem problem(setup);
 
-            auto start = std::chrono::steady_clock::now();
-            auto best = problem.run(1000);
-            auto end = std::chrono::steady_clock::now();
+                    auto start = std::chrono::steady_clock::now();
+                    auto best = problem.run(1000);
+                    auto end = std::chrono::steady_clock::now();
 
-            long long ms =
-                std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+                    long long ms =
+                        std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-            total_ms += ms;
-            best_fitness_last_run = best.savedFitness;
+                    total_ms += ms;
+                    best_fitness_last_run = best.savedFitness;
 
-            std::cout << "Run " << r << ": " << ms << " ms"
-                      << " | best fitness = " << best.savedFitness << "\n";
+                    std::cout << "Run " << r << ": " << ms << " ms"
+                            << " | best fitness = " << best.savedFitness << "\n";
+                }
+
+                double avg_ms = total_ms / double(RUNS);
+
+                std::cout << ">>> Average time (" << threads << " threads): "
+                        << avg_ms << " ms\n";
+
+                csv << problem_name
+                    << "," << setup.N
+                    << "," << setup.POP_SIZE
+                    << "," << threads
+                    << "," << avg_ms
+                    << "," << best_fitness_last_run
+                    << "\n";
+            }
+
+            csv.close();
         }
-
-        double avg_ms = total_ms / double(RUNS);
-
-        std::cout << ">>> Average time (" << threads << " threads): "
-                  << avg_ms << " ms\n";
-
-        csv << problem_name
-            << "," << setup.N
-            << "," << setup.POP_SIZE
-            << "," << threads
-            << "," << avg_ms
-            << "," << best_fitness_last_run
-            << "\n";
     }
-
-    csv.close();
-    std::cout << "\nAll results written to " << filename << "\n";
-
     return 0;
 }

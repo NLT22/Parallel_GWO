@@ -1,9 +1,0 @@
-problem,N,POP_SIZE,avg_ms,best_fitness_last_run
-Rastrigin,10,1000,363,0problem,N,POP_SIZE,avg_ms,best_fitness_last_run
-Rastrigin,10,100,36.4,0
-problem,N,POP_SIZE,avg_ms,best_fitness_last_run
-Rastrigin,10,10,7.6,0
-problem,N,POP_SIZE,avg_ms,best_fitness_last_run
-Rastrigin,10,10,5,0
-Rastrigin,10,100,37,0
-Rastrigin,10,100,33.6,0
