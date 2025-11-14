@@ -1,8 +1,11 @@
 #include <iostream>
 #define _USE_MATH_DEFINES
 #include <cmath>
-#include <chrono>
+#include <chrono>      
+#include <fstream>      
 #include "gwo_serial.hpp"
+#include "gwo_pcc.hpp"
+#include <filesystem> 
 
 // g++ -O2 -std=c++20 -I "..\eigen-5.0.0" gwo_serial_test.cpp -o serial_test.exe
 
@@ -27,25 +30,71 @@ struct RastriginProblem : public GWO::Problem<double>
 
 int main() {
     GWO::Setup setup;
-    setup.N = 100;                
-    setup.POP_SIZE = 500;         
-    setup.maxRange = Eigen::ArrayXd::Constant(setup.N, 10.0);
-    setup.minRange = Eigen::ArrayXd::Constant(setup.N, -10.0);
+    setup.N = 10;                
+    setup.POP_SIZE = 100;         
+    setup.maxRange = Eigen::ArrayXd::Constant(setup.N, 5);
+    setup.minRange = Eigen::ArrayXd::Constant(setup.N, -5);
 
-    // Seed để cố định giá trị
-    GWO::rng.state = 123456789ULL;  
+    // Số lần chạy 
+    const int RUNS = 10;
 
-    RastriginProblem problem(setup);
+    long long total_ms = 0;
+    double best_fitness_last_run = 0.0;
+    std::string problem_name = "Rastrigin";
 
-    auto start = std::chrono::steady_clock::now();
-    auto best = problem.run(1000);  
-    auto end = std::chrono::steady_clock::now();
+    for (int r = 1; r <= RUNS; r++)
+    {
+        GWO::rng.state = 123456789ULL;  
 
-    long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        RastriginProblem problem(setup);
 
-    std::cout << "Time: " << ms << " ms\n";
-    std::cout << "Best fitness: " << best.savedFitness << "\n";
-    std::cout << "Best position (first 5 dims): [";
-    for (int i = 0; i < std::min<int>(5, setup.N); ++i)
-        std::cout << best.pos[i] << (i < 4 ? ", " : "]\n");
+        auto start = std::chrono::steady_clock::now();
+
+        // GWO tuần tự
+        auto best = problem.run(1000);  
+
+        // PCC-GWO -> kết quả không khả quan :v
+        // auto best = GWO::run_pccgwo(problem, 1000, 4);
+
+        auto end = std::chrono::steady_clock::now();
+
+        long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        total_ms += ms;
+        best_fitness_last_run = best.savedFitness;   // lưu lại fitness lần cuối
+
+        std::cout << "Run " << r << ": " << ms << " ms"
+                  << " | best fitness = " << best.savedFitness << "\n";
+    }
+
+    double avg = total_ms / double(RUNS);
+
+    std::cout << "-----------------------------------\n";
+    std::cout << "Average time over " << RUNS << " runs: " << avg << " ms\n";
+
+    std::string filename = "gwo_serial.csv";
+
+    bool need_header = (!std::filesystem::exists(filename) ||
+                        std::filesystem::file_size(filename) == 0);
+
+    std::ofstream csv(filename, std::ios::app);
+
+    if (!csv) {
+        std::cerr << "Cannot open gwo_results.csv for writing!\n";
+        return 1;
+    }
+
+    if (need_header) {
+        csv << "problem,N,POP_SIZE,avg_ms,best_fitness_last_run\n";
+    }
+
+    csv << problem_name
+        << "," << setup.N
+        << "," << setup.POP_SIZE
+        << "," << avg
+        << "," << best_fitness_last_run
+        << "\n";
+
+    csv.close();
+
+    return 0;
 }

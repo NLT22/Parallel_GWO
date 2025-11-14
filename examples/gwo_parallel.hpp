@@ -1,6 +1,5 @@
 #ifndef GWO_PARALLEL_HPP
 #define GWO_PARALLEL_HPP
-
 #include <iostream>
 #include <random>
 #include <vector>
@@ -15,11 +14,9 @@
 
 namespace GWO
 {
-    // Thay đổi hàm random để có thể sinh số ngẫu nhiên dựa trên chỉ số
+    uint64_t global_seed = 123456789ULL;
 
-    inline uint64_t global_seed = 123456789ULL;
-
-    inline uint64_t splitmix64(uint64_t x)
+    uint64_t splitmix64(uint64_t x)
     {
         x += 0x9E3779B97F4A7C15ULL;
         x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ULL;
@@ -28,7 +25,7 @@ namespace GWO
         return x;
     }
 
-    inline double indexed_random(int iter, int wid, int dim, int channel)
+    double indexed_random(int iter, int wid, int dim, int channel)
     {
         uint64_t mix =
             (uint64_t)iter * 0x9E3779B97F4A7C15ULL ^
@@ -102,7 +99,7 @@ namespace GWO
         }
         
         virtual T fitness(const Eigen::ArrayX<T> &pos) const = 0;
-
+        
         Problem(Setup _setup): nextPos(_setup.N),
                                A(_setup.N), C(_setup.N), setup(std::move(_setup))
         {
@@ -128,7 +125,7 @@ namespace GWO
                 }
             }
         }
-
+        
         Wolf<T> run(int maxIterations)
         {
             update_fitness_and_heap();
@@ -139,25 +136,24 @@ namespace GWO
             }
             return getBestKWolves()[0];
         }
-
+        
         void update_fitness_and_heap()
         {
-            Eigen::ArrayXX<T> P(setup.POP_SIZE, setup.N);
+            Eigen::ArrayXX<T> positions(setup.POP_SIZE, setup.N);
             for (size_t i = 0; i < setup.POP_SIZE; ++i)
             {
-                P.row(i) = population[i].pos;
+                positions.row(i) = population[i].pos;
             }
-
-            auto fitness_values = this->fitness_batch(P);
+            Eigen::ArrayX<T> fitness_values = this->fitness_batch(positions);
             heap = {};
-
             for (size_t i = 0; i < setup.POP_SIZE; ++i)
             {
                 population[i].savedFitness = fitness_values(i);
                 heap.push(population[i]);
-
                 if (heap.size() > constants::K)
+                {
                     heap.pop();
+                }
             }
         }
 

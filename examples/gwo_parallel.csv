@@ -1,0 +1,7 @@
+problem,N,POP_SIZE,threads,avg_ms,best_fitness_last_run
+Rastrigin,10,100,1,57.5,0
+Rastrigin,10,100,2,104.9,0
+Rastrigin,10,100,4,123.5,0
+Rastrigin,10,100,8,184.3,0
+Rastrigin,10,100,16,319.6,0
+Rastrigin,10,100,20,431.4,0
