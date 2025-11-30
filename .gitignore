@@ -3,3 +3,4 @@ examples/plots/
 examples/plots_best_thread/
 linux/plots/
 linux/plots_best_thread/
+*.exe

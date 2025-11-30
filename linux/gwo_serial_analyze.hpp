@@ -1,0 +1,254 @@
+#ifndef GWO_HPP
+#define GWO_HPP
+
+#include <iostream>
+#include <random>
+#include <vector>
+#include <concepts>
+#include <queue>
+#include <Eigen/Dense>
+#include <stdexcept>
+#include <chrono>   // thêm cho ScopedTimer
+
+namespace GWO
+{
+    // ====== Profiler dùng cho Amdahl ======
+    struct Profiling {
+        static inline long long t_fitness_batch_ns = 0;
+        static inline long long t_updatePop_ns     = 0;
+        static inline long long t_updateFH_ns      = 0;
+        static inline long long t_run_ns           = 0;
+    };
+
+    struct ScopedTimer {
+        std::chrono::steady_clock::time_point start;
+        long long &acc;
+
+        ScopedTimer(long long &accum)
+            : start(std::chrono::steady_clock::now()), acc(accum) {}
+
+        ~ScopedTimer() {
+            auto end = std::chrono::steady_clock::now();
+            acc += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        }
+    };
+
+    // ====== RNG đơn giản (XorShift64) ======
+    struct XorShift64
+    {
+        uint64_t state;
+        uint64_t next()
+        {
+            uint64_t x = state;
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            return state = x;
+        }
+    };
+
+    // global RNG cho bản tuần tự
+    inline std::random_device rd_seed;
+    inline XorShift64 rng{rd_seed()};
+
+    template <std::floating_point T>
+    T random(T min, T max)
+    {
+        double zero_to_one = (rng.next() >> 11) * 0x1.0p-53;
+        return min + zero_to_one * (max - min);
+    }
+
+    namespace constants
+    {
+        inline size_t K = 3; // alpha, beta, delta
+    }
+
+    // ====== Setup cho bài toán ======
+    struct Setup
+    {
+        size_t N{};        // số chiều
+        size_t POP_SIZE{}; // số sói
+        Eigen::ArrayXd maxRange;
+        Eigen::ArrayXd minRange;
+    };
+
+    // ====== Wolf (một cá thể) ======
+    template <std::floating_point T>
+    struct Wolf
+    {
+        Wolf(size_t n) : pos(n), len(n) {}
+
+        void randomize(const Eigen::ArrayXd &min, const Eigen::ArrayXd &max)
+        {
+            for (size_t i = 0; i < len; i++)
+            {
+                pos[i] = random<T>(min[i], max[i]);
+            }
+        }
+
+        T savedFitness{};
+        Eigen::ArrayX<T> pos;
+        size_t len{};
+    };
+
+    template <std::floating_point T>
+    std::ostream &operator<<(std::ostream &os, const Wolf<T> &wolf)
+    {
+        os << "[";
+        for (size_t i = 0; i < wolf.len - 1; i++)
+        {
+            os << wolf.pos[i] << ",";
+        }
+        os << wolf.pos[wolf.len - 1] << "]";
+        return os;
+    }
+
+    // ====== Comparator cho priority_queue ======
+    template <std::floating_point T>
+    class Comparator
+    {
+    public:
+        bool operator()(const Wolf<T> &w1, const Wolf<T> &w2)
+        {
+            // giữ nguyên logic gốc
+            return w1.savedFitness < w2.savedFitness;
+        }
+    };
+
+    // ====== Problem template ======
+    template <std::floating_point T>
+    struct Problem
+    {
+        // Có thể override fitness_batch hoặc fitness
+        virtual Eigen::ArrayX<T> fitness_batch(const Eigen::ArrayXX<T> &population_pos) const
+        {
+            Eigen::ArrayX<T> fitness_values(population_pos.rows());
+
+            ScopedTimer timer(GWO::Profiling::t_fitness_batch_ns);
+            for (int i = 0; i < population_pos.rows(); ++i)
+            {
+                fitness_values(i) = this->fitness(population_pos.row(i));
+            }
+            return fitness_values;
+        }
+
+        virtual T fitness(const Eigen::ArrayX<T> & /*pos*/) const
+        {
+            throw std::runtime_error("fitness() not implemented. Did you mean to implement fitness_batch()?");
+        };
+
+        Problem(Setup _setup)
+            : nextPos(_setup.N),
+              A(_setup.N), C(_setup.N),
+              setup(std::move(_setup))
+        {
+            if (setup.N == 0 || setup.POP_SIZE == 0)
+                throw std::invalid_argument("N and POP_SIZE must be > 0.");
+            if (setup.minRange.size() != setup.N || setup.maxRange.size() != setup.N)
+                throw std::invalid_argument("minRange and maxRange must have size N.");
+            if ((setup.maxRange < setup.minRange).any())
+                throw std::invalid_argument("All elements of maxRange must be >= minRange.");
+
+            population.reserve(setup.POP_SIZE);
+            for (size_t i = 0; i < setup.POP_SIZE; i++)
+            {
+                population.emplace_back(setup.N);
+                population.back().randomize(setup.minRange, setup.maxRange);
+            }
+        }
+
+        // ----- Chạy GWO tuần tự -----
+        Wolf<T> run(int maxIterations)
+        {
+            ScopedTimer timer(GWO::Profiling::t_run_ns);
+
+            update_fitness_and_heap();
+            for (int i = 0; i < maxIterations; i++)
+            {
+                T a = 2 * (1 - T(i) / T(maxIterations));
+                updatePopulation(a);
+            }
+            return getBestKWolves()[0];
+        }
+
+        // ----- Tính fitness + xây heap top-K -----
+        void update_fitness_and_heap()
+        {
+            ScopedTimer timer(GWO::Profiling::t_updateFH_ns);
+
+            Eigen::ArrayXX<T> positions(setup.POP_SIZE, setup.N);
+            for (size_t i = 0; i < setup.POP_SIZE; ++i)
+            {
+                positions.row(i) = population[i].pos;
+            }
+            Eigen::ArrayX<T> fitness_values = this->fitness_batch(positions);
+
+            heap = {};
+            for (size_t i = 0; i < setup.POP_SIZE; ++i)
+            {
+                population[i].savedFitness = fitness_values(i);
+                heap.push(population[i]);
+                if (heap.size() > constants::K)
+                {
+                    heap.pop();
+                }
+            }
+        }
+
+        // ----- Cập nhật vị trí sói (theo GWO) -----
+        void updatePopulation(T a)
+        {
+            auto bestWolves = getBestKWolves();
+
+            {
+                ScopedTimer timer(GWO::Profiling::t_updatePop_ns);
+
+                for (auto &wolf : population)
+                {
+                    nextPos.setZero();
+                    for (size_t j = 0; j < constants::K; j++)
+                    {
+                        for (size_t k = 0; k < setup.N; k++)
+                        {
+                            A[k] = 2 * a * random<T>(0.0, 1.0) - a;
+                            C[k] = 2 * random<T>(0.0, 1.0);
+                        }
+                        auto &bestWolf = bestWolves[j];
+                        auto D = (bestWolf.pos * C - wolf.pos).abs();
+                        nextPos += bestWolf.pos - D * A;
+                    }
+
+                    wolf.pos = (nextPos / T(constants::K))
+                                   .max(setup.minRange.template cast<T>())
+                                   .min(setup.maxRange.template cast<T>());
+                }
+            }
+
+            // sau khi cập nhật vị trí -> tính lại fitness + heap
+            update_fitness_and_heap();
+        }
+
+        // ----- Lấy K con sói "tốt nhất" từ heap -----
+        auto getBestKWolves()
+        {
+            std::vector<Wolf<T>> bestWolves;
+            auto copy = heap;
+            while (!copy.empty())
+            {
+                bestWolves.push_back(std::move(copy.top()));
+                copy.pop();
+            }
+            return bestWolves;
+        }
+
+        std::vector<Wolf<T>> population;
+        std::priority_queue<Wolf<T>, std::vector<Wolf<T>>, Comparator<T>> heap;
+        Eigen::ArrayX<T> nextPos;
+        Eigen::ArrayX<T> A;
+        Eigen::ArrayX<T> C;
+        const Setup setup;
+    };
+
+} // namespace GWO
+
+#endif
