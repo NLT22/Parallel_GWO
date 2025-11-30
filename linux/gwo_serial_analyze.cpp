@@ -11,7 +11,7 @@
 
 #include "gwo_serial_analyze.hpp"
 
-// g++ -O2 -std=c++20 -I "../eigen-5.0.0" gwo_serial_analyze.cpp -o serial_analyze
+// g++ -O2 -std=c++20 -I "../eigen-5.0.0" gwo_serial_analyze.cpp -o serial_analyze.exe
 
 struct SphereProblem : public GWO::Problem<double>
 {
@@ -112,7 +112,8 @@ int main() {
             double upd_ms  = ns_to_ms(upd_ns);
             double heap_ms = ns_to_ms(fh_exclusive_ns);
 
-            double other_ms = ns_to_ms(total_run_ns - (fit_ns + upd_ns + fh_exclusive_ns));
+            double other_ns = std::max(0.0, total_run_ns - (fit_ns + upd_ns + fh_exclusive_ns));
+            double other_ms = ns_to_ms(other_ns);
 
             double p_fit = 0.0, p_upd = 0.0, p_heap = 0.0, p_other = 0.0;
             if (total_run_ns > 0) {

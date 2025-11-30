@@ -6,7 +6,7 @@
 #include <filesystem>
 #include "gwo_parallel.hpp"
 
-// g++ -O2 -std=c++20 -fopenmp -I "../eigen-5.0.0" gwo_parallel_test.cpp -o parallel_test.exe
+// g++ -O2 -std=c++20 -fopenmp -I "../eigen-5.0.0" gwo_parallel_test.cpp -o parallel_test
 
 struct SphereProblem : public GWO::Problem<double>
 {

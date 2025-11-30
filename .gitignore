@@ -1,6 +1,8 @@
 *.png
 examples/plots/
 examples/plots_best_thread/
+examples/plots_analyze/
 linux/plots/
 linux/plots_best_thread/
+linux/plots_analyze/
 *.exe
