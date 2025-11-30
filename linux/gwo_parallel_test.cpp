@@ -29,7 +29,7 @@ struct RastriginProblem : public GWO::Problem<double>
 int main() {
     std::vector<int> N_list = {10, 50, 100, 500, 1000};
     std::vector<int> Pop_list = {50, 100, 200, 500, 1000
-                                // , 2000, 5000, 10000, 20000
+                                , 2000, 5000, 10000, 20000
                                 // , 50000, 100000
                                 };
     std::vector<int> thread_list = {2, 4, 8, 16, 20};

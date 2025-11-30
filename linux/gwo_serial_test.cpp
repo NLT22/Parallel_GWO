@@ -4,10 +4,9 @@
 #include <chrono>      
 #include <fstream>      
 #include "gwo_serial.hpp"
-#include "gwo_pcc.hpp"
 #include <filesystem> 
 
-// g++ -O2 -std=c++20 -I "../eigen-5.0.0" gwo_serial_test.cpp -o serial_test.exe
+// g++ -O2 -std=c++20 -I "../eigen-5.0.0" gwo_serial_test.cpp -o serial_test
 
 struct SphereProblem : public GWO::Problem<double>
 {
@@ -31,7 +30,7 @@ struct RastriginProblem : public GWO::Problem<double>
 int main() {
     std::vector<int> N_list = {10, 50, 100, 500, 1000};
     std::vector<int> Pop_list = {50, 100, 200, 500, 1000
-                                // , 2000, 5000, 10000, 20000
+                                , 2000, 5000, 10000, 20000
                                 // , 50000, 100000
                                 };
     const int RUNS = 5; 
