@@ -213,16 +213,12 @@ namespace GWO
             return best;
         }
 
-        // DATA
         std::vector<Wolf<T>> population;
         std::priority_queue<Wolf<T>, std::vector<Wolf<T>>, Comparator<T>> heap;
-
         Eigen::ArrayX<T> nextPos;
         Eigen::ArrayX<T> A;
         Eigen::ArrayX<T> C;
-
         const Setup setup;
     };
 }
-
 #endif

@@ -59,18 +59,12 @@ int main() {
                 RastriginProblem problem(setup);
 
                 auto start = std::chrono::steady_clock::now();
-
-                // GWO tuần tự
                 auto best = problem.run(1000);  
-
-                // PCC-GWO -> kết quả không khả quan :v
-                // auto best = GWO::run_pccgwo(problem, 1000, 4);
-
                 auto end = std::chrono::steady_clock::now();
 
                 long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
                 total_ms += ms;
-                best_fitness_last_run = best.savedFitness;   // lưu lại fitness lần cuối
+                best_fitness_last_run = best.savedFitness;  
 
                 std::cout << "Run " << r << ": " << ms << " ms"
                         << " | best fitness = " << best.savedFitness << "\n";
