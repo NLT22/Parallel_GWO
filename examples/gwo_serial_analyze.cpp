@@ -35,7 +35,7 @@ struct RastriginProblem : public GWO::Problem<double>
 int main() {
     std::vector<int> N_list   = {10, 50, 100, 500, 1000};
     std::vector<int> Pop_list = {50, 100, 200, 500, 1000};
-    const int RUNS = 5;  // số lần chạy để lấy thời gian trung bình
+    const int RUNS = 5; 
 
     std::string problem_name = "Rastrigin";
     std::string filename     = "gwo_serial_analyze.csv";
@@ -72,7 +72,6 @@ int main() {
             long long total_wall_ms = 0;
             double best_fitness_last_run = 0.0;
 
-            // reset profiler cho cấu hình này
             GWO::Profiling::t_fitness_batch_ns = 0;
             GWO::Profiling::t_updatePop_ns     = 0;
             GWO::Profiling::t_updateFH_ns      = 0;
@@ -80,7 +79,6 @@ int main() {
 
             for (int r = 1; r <= RUNS; r++)
             {
-                // reset RNG để các run giống nhau
                 GWO::rng.state = 123456789ULL;
 
                 RastriginProblem problem(setup);
@@ -96,7 +94,6 @@ int main() {
 
             double avg_wall_ms = total_wall_ms / double(RUNS);
 
-            // ====== Phân tích profiler theo "trung bình 1 run" ======
             auto ns_to_ms = [](double ns) { return ns / 1e6; };
 
             double total_run_ns = static_cast<double>(GWO::Profiling::t_run_ns) / RUNS;
@@ -104,7 +101,7 @@ int main() {
             double upd_ns       = static_cast<double>(GWO::Profiling::t_updatePop_ns) / RUNS;
             double fh_ns        = static_cast<double>(GWO::Profiling::t_updateFH_ns) / RUNS;
 
-            double fh_exclusive_ns = fh_ns - fit_ns; // phần heap/copy không tính fitness
+            double fh_exclusive_ns = fh_ns - fit_ns;
             if (fh_exclusive_ns < 0) fh_exclusive_ns = 0;
 
             double run_ms  = ns_to_ms(total_run_ns);
@@ -122,7 +119,6 @@ int main() {
                 p_other= 100.0 * other_ns        / total_run_ns;
             }
 
-            // In ra console tóm tắt cho cấu hình này
             std::cout << std::fixed << std::setprecision(2);
             std::cout << "Avg wall time over " << RUNS << " runs: "
                       << avg_wall_ms << " ms\n";
@@ -134,7 +130,6 @@ int main() {
             std::cout << "    heap/copy (exclusive): " << heap_ms << " ms (" << p_heap << "%)\n";
             std::cout << "    others: " << other_ms << " ms (" << p_other << "%)\n\n";
 
-            // Ghi CSV: 1 dòng / (N, POP_SIZE)
             csv << problem_name
                 << "," << setup.N
                 << "," << setup.POP_SIZE

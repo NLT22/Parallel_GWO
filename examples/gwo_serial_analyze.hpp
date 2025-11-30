@@ -12,7 +12,6 @@
 
 namespace GWO
 {
-    // ====== Profiler dùng cho Amdahl ======
     struct Profiling {
         static inline long long t_fitness_batch_ns = 0;
         static inline long long t_updatePop_ns     = 0;
@@ -33,7 +32,6 @@ namespace GWO
         }
     };
 
-    // ====== RNG đơn giản (XorShift64) ======
     struct XorShift64
     {
         uint64_t state;
@@ -47,7 +45,6 @@ namespace GWO
         }
     };
 
-    // global RNG cho bản tuần tự
     inline std::random_device rd_seed;
     inline XorShift64 rng{rd_seed()};
 
@@ -63,16 +60,14 @@ namespace GWO
         inline size_t K = 3; // alpha, beta, delta
     }
 
-    // ====== Setup cho bài toán ======
     struct Setup
     {
-        size_t N{};        // số chiều
-        size_t POP_SIZE{}; // số sói
+        size_t N{};        
+        size_t POP_SIZE{}; 
         Eigen::ArrayXd maxRange;
         Eigen::ArrayXd minRange;
     };
 
-    // ====== Wolf (một cá thể) ======
     template <std::floating_point T>
     struct Wolf
     {
@@ -103,23 +98,19 @@ namespace GWO
         return os;
     }
 
-    // ====== Comparator cho priority_queue ======
     template <std::floating_point T>
     class Comparator
     {
     public:
         bool operator()(const Wolf<T> &w1, const Wolf<T> &w2)
         {
-            // giữ nguyên logic gốc
             return w1.savedFitness < w2.savedFitness;
         }
     };
 
-    // ====== Problem template ======
     template <std::floating_point T>
     struct Problem
     {
-        // Có thể override fitness_batch hoặc fitness
         virtual Eigen::ArrayX<T> fitness_batch(const Eigen::ArrayXX<T> &population_pos) const
         {
             Eigen::ArrayX<T> fitness_values(population_pos.rows());
@@ -157,7 +148,6 @@ namespace GWO
             }
         }
 
-        // ----- Chạy GWO tuần tự -----
         Wolf<T> run(int maxIterations)
         {
             ScopedTimer timer(GWO::Profiling::t_run_ns);
@@ -171,7 +161,6 @@ namespace GWO
             return getBestKWolves()[0];
         }
 
-        // ----- Tính fitness + xây heap top-K -----
         void update_fitness_and_heap()
         {
             ScopedTimer timer(GWO::Profiling::t_updateFH_ns);
@@ -195,7 +184,6 @@ namespace GWO
             }
         }
 
-        // ----- Cập nhật vị trí sói (theo GWO) -----
         void updatePopulation(T a)
         {
             auto bestWolves = getBestKWolves();
@@ -224,11 +212,9 @@ namespace GWO
                 }
             }
 
-            // sau khi cập nhật vị trí -> tính lại fitness + heap
             update_fitness_and_heap();
         }
 
-        // ----- Lấy K con sói "tốt nhất" từ heap -----
         auto getBestKWolves()
         {
             std::vector<Wolf<T>> bestWolves;
@@ -249,6 +235,6 @@ namespace GWO
         const Setup setup;
     };
 
-} // namespace GWO
+} 
 
 #endif
