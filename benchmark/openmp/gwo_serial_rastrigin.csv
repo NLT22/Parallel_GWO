@@ -1,0 +1,15 @@
+problem,N,POP_SIZE,max_iters,avg_ms,best_fitness
+Rastrigin,10,50,1000,17.6,0
+Rastrigin,10,100,1000,32.4,0
+Rastrigin,10,200,1000,65.8,0
+Rastrigin,10,500,1000,163.6,0
+Rastrigin,10,1000,1000,323.8,0
+Rastrigin,50,50,1000,55.2,0
+Rastrigin,50,100,1000,109.6,0
+Rastrigin,50,200,1000,238.2,0
+Rastrigin,50,500,1000,563.4,0
+Rastrigin,50,1000,1000,1100.2,0
+Rastrigin,100,50,1000,106.8,0
+Rastrigin,100,100,1000,216.8,0
+Rastrigin,100,200,1000,422.4,0
+Rastrigin,100,500,1000,1068.6,0
