@@ -13,7 +13,7 @@
 #include <omp.h>
 #endif
 
-#include "../benchmark/openmp/gwo_parallel_sync.hpp"
+#include "gwo_parallel_sync.hpp"
 // Build (MSYS2):
 // g++ -O2 -std=c++20 -fopenmp gwo_parallel_kmeans_bm.cpp -o parallel_kmeans.exe -I ../eigen-5.0.0
 
@@ -114,7 +114,10 @@ struct KMeansProblemCPU_OMP : public GWO::Problem<double> {
         : GWO::Problem<double>(s), X(X_), Ndata(N_), D(D_), K(K_) {}
 
     double fitness(const Eigen::ArrayXd& pos) const override {
-        std::vector<float> c((size_t)K * (size_t)D);
+        // thread-local buffer to avoid per-call allocation
+        thread_local std::vector<float> c;
+        c.resize((size_t)K * (size_t)D);
+
         for (int i = 0; i < K * D; ++i) c[(size_t)i] = (float)pos(i);
         return kmeans_sse_cpu(X, Ndata, D, c.data(), K);
     }
@@ -166,6 +169,7 @@ int main() {
 
         for (int threads : thread_list) {
             #ifdef _OPENMP
+            omp_set_dynamic(0);
             omp_set_num_threads(threads);
             omp_set_nested(0);
             #endif
