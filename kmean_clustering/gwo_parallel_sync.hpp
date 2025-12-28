@@ -1,3 +1,5 @@
+// gwo_parallel_sync.hpp
+
 #ifndef GWO_PARALLEL_SYNC_HPP
 #define GWO_PARALLEL_SYNC_HPP
 

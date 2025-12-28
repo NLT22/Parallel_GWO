@@ -12,6 +12,8 @@
 #include <cuda_runtime.h>
 
 //  nvcc -O2 -std=c++20 gwo_cuda_kmeans_bm.cu -o cuda_kmeans.exe
+// nvcc -O2 -std=c++20 -gencode arch=compute_86,code=sm_86 -o cuda_kmeans gwo_cuda_kmeans_bm.cu
+
 
 static inline void cuda_check(cudaError_t e, const char* msg) {
     if (e != cudaSuccess) {
@@ -360,7 +362,7 @@ int main() {
     const int MAX_ITERS = 100;
     const uint64_t SEED = 123456789ULL;
 
-    std::vector<int> Pop_list = {32, 64, 128};
+    std::vector<int> Pop_list = {25, 50, 100, 200};
 
     MNIST train = load_mnist_images_labels(
         "./mnist/train-images-idx3-ubyte",

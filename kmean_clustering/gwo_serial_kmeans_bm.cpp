@@ -132,7 +132,7 @@ int main() {
     const int MAX_ITERS = 100;
     const uint64_t SEED = 123456789ULL;
 
-    std::vector<int> Pop_list = {32, 64, 128};
+    std::vector<int> Pop_list = {25, 50, 100, 200};
 
     // ===================== Load MNIST (timed) =====================
     auto t_load0 = clock::now();

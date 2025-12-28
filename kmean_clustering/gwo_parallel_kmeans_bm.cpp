@@ -14,7 +14,7 @@
 #endif
 
 #include "gwo_parallel_sync.hpp"
-// Build (MSYS2):
+
 // g++ -O2 -std=c++20 -fopenmp gwo_parallel_kmeans_bm.cpp -o parallel_kmeans.exe -I ../eigen-5.0.0
 
 // ===================== MNIST IDX LOADER (embedded) =====================
@@ -125,13 +125,13 @@ struct KMeansProblemCPU_OMP : public GWO::Problem<double> {
 
 int main() {
     // ===================== CONFIG =====================
-    const int LIMIT_TRAIN = 1000; // tăng lên 60000 nếu muốn nặng hơn
+    const int LIMIT_TRAIN = 1000; 
     const int K = 10;
     const int RUNS = 1;
     const int MAX_ITERS = 100;
     const uint64_t SEED = 123456789ULL;
 
-    std::vector<int> Pop_list = {32, 64, 128};
+    std::vector<int> Pop_list = {25, 50, 100, 200};
     std::vector<int> thread_list = {2, 4, 8, 16, 20};
 
     // ===================== Load MNIST =====================

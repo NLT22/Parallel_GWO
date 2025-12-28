@@ -1,10 +1,9 @@
-impl,limit_train,Ndata,D,K,POP_SIZE,max_iters,runs,avg_ms,best_sse,platform,device,ocl_version,fp_mode,local_x,nGroupsX
-opencl,1000,1000,784,10,32,100,1,1216,69657.3,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,16
-opencl,1000,1000,784,10,64,100,1,2307,65695.1,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,16
-opencl,1000,1000,784,10,128,100,1,4696,63052.5,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,16
-opencl,1000,1000,784,10,32,100,1,15561,69657.3,"Intel(R) OpenCL HD Graphics","Intel(R) Iris(R) Xe Graphics","OpenCL 3.0 NEO ",FP32,64,16
-opencl,1000,1000,784,10,64,100,1,30550,65695.1,"Intel(R) OpenCL HD Graphics","Intel(R) Iris(R) Xe Graphics","OpenCL 3.0 NEO ",FP32,64,16
-opencl,1000,1000,784,10,128,100,1,60835,63052.5,"Intel(R) OpenCL HD Graphics","Intel(R) Iris(R) Xe Graphics","OpenCL 3.0 NEO ",FP32,64,16
-opencl,1000,1000,784,10,32,100,1,1277,69657.3,"Intel(R) OpenCL","12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 (Build 0)",FP64,64,16
-opencl,1000,1000,784,10,64,100,1,2486,65695.1,"Intel(R) OpenCL","12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 (Build 0)",FP64,64,16
-opencl,1000,1000,784,10,128,100,1,4873,63052.5,"Intel(R) OpenCL","12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 (Build 0)",FP64,64,16
+impl,limit_train,Ndata,D,K,POP_SIZE,max_iters,runs,avg_ms,best_sse,platform,device,ocl_version,fp_mode,local_x,nGroupsX,platform_idx,device_idx
+opencl,1000,1000,784,10,25,100,1,982,70850.1,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,16,1,0
+opencl,1000,1000,784,10,50,100,1,1826,65756.3,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,16,1,0
+opencl,1000,1000,784,10,100,100,1,3624,63364.1,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,16,1,0
+opencl,1000,1000,784,10,200,100,1,7202,61349.9,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,16,1,0
+opencl,1000,1000,784,10,25,100,1,1794,70850.1,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,16,2,0
+opencl,1000,1000,784,10,50,100,1,3285,65756.3,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,16,2,0
+opencl,1000,1000,784,10,100,100,1,6478,63364.1,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,16,2,0
+opencl,1000,1000,784,10,200,100,1,14024,61349.9,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,16,2,0
