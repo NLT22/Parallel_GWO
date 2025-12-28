@@ -199,10 +199,10 @@ int main() {
 
     try {
         // ---- load dataset ----
-        auto X_train = load_data("../madelon/MADELON/madelon_train.data");
-        auto y_train = load_labels("../madelon/MADELON/madelon_train.labels");
-        auto X_valid = load_data("../madelon/MADELON/madelon_valid.data");
-        auto y_valid = load_labels("../madelon/MADELON/madelon_valid.labels");
+        auto X_train = load_data("./madelon/MADELON/madelon_train.data");
+        auto y_train = load_labels("./madelon/MADELON/madelon_train.labels");
+        auto X_valid = load_data("./madelon/MADELON/madelon_valid.data");
+        auto y_valid = load_labels("./madelon/MADELON/madelon_valid.labels");
 
         std::cout << "Current path: " << std::filesystem::current_path() << "\n";
         std::cout << "Loaded train=" << X_train.size() << "x" << X_train[0].size()
