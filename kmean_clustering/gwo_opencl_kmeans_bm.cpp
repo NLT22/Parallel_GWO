@@ -268,7 +268,8 @@ int main(int argc, char** argv) {
         const int MAX_ITERS = 100;
         const uint64_t SEED = 123456789ULL;
 
-        std::vector<int> Pop_list = {25, 50, 100, 200};
+        // std::vector<int> Pop_list = {25, 50, 100, 200};
+        std::vector<int> Pop_list = {400, 800};
 
         // Fallback target filter (optional)
         std::vector<TargetDevice> targets = {
@@ -590,7 +591,7 @@ int main(int argc, char** argv) {
 
                     std::cout << "Run " << r
                               << " | " << ms << " ms"
-                              << " | best SSE(OpenMP-style)=" << bestSSE
+                              << " | best SSE=" << bestSSE
                               << " | idx0=" << best3[0] << "\n";
 
                     double avg_ms = total_ms / double(RUNS);

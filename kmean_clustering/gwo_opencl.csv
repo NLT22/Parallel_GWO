@@ -1,9 +1,25 @@
 impl,limit_train,Ndata,D,K,POP_SIZE,max_iters,runs,avg_ms,best_sse,platform,device,ocl_version,fp_mode,local_x,nGroupsX,platform_idx,device_idx
-opencl,1000,1000,784,10,25,100,1,982,70850.1,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,16,1,0
-opencl,1000,1000,784,10,50,100,1,1826,65756.3,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,16,1,0
-opencl,1000,1000,784,10,100,100,1,3624,63364.1,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,16,1,0
-opencl,1000,1000,784,10,200,100,1,7202,61349.9,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,16,1,0
-opencl,1000,1000,784,10,25,100,1,1794,70850.1,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,16,2,0
-opencl,1000,1000,784,10,50,100,1,3285,65756.3,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,16,2,0
-opencl,1000,1000,784,10,100,100,1,6478,63364.1,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,16,2,0
-opencl,1000,1000,784,10,200,100,1,14024,61349.9,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,16,2,0
+opencl,5000,5000,784,10,25,100,1,12816,349761,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,79,1,0
+opencl,5000,5000,784,10,50,100,1,26180,337067,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,79,1,0
+opencl,5000,5000,784,10,100,100,1,52858,324975,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,79,1,0
+opencl,5000,5000,784,10,200,100,1,106275,313432,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,79,1,0
+opencl,5000,5000,784,10,25,100,1,9436,349761,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,79,2,0
+opencl,5000,5000,784,10,50,100,1,21092,337067,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,79,2,0
+opencl,5000,5000,784,10,100,100,1,35467,324975,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,79,2,0
+opencl,5000,5000,784,10,200,100,1,68321,313432,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,79,2,0
+opencl,500,500,784,10,25,100,1,503,33297,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,8,1,0
+opencl,500,500,784,10,50,100,1,908,31873.9,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,8,1,0
+opencl,500,500,784,10,100,100,1,1822,31268.1,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,8,1,0
+opencl,500,500,784,10,200,100,1,3583,30299,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,8,1,0
+opencl,500,500,784,10,25,100,1,937,33297,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,8,2,0
+opencl,500,500,784,10,50,100,1,1913,31873.9,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,8,2,0
+opencl,500,500,784,10,100,100,1,3782,31268.1,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,8,2,0
+opencl,500,500,784,10,200,100,1,7875,30299,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,8,2,0
+opencl,5000,5000,784,10,400,100,1,213059,307324,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,79,1,0
+opencl,5000,5000,784,10,800,100,1,426608,303254,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,79,1,0
+opencl,5000,5000,784,10,400,100,1,138343,307324,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,79,2,0
+opencl,5000,5000,784,10,800,100,1,269894,303254,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,79,2,0
+opencl,1000,1000,784,10,400,100,1,14189,60749.2,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,16,1,0
+opencl,1000,1000,784,10,800,100,1,28421,59509.4,"NVIDIA CUDA","NVIDIA GeForce RTX 3050 Ti Laptop GPU","OpenCL 3.0 CUDA",FP64,64,16,1,0
+opencl,1000,1000,784,10,400,100,1,25465,60749.2,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,16,2,0
+opencl,1000,1000,784,10,800,100,1,56690,59509.4,"Portable Computing Language","cpu-haswell-12th Gen Intel(R) Core(TM) i7-12700H","OpenCL 3.0 PoCL HSTR: cpu-x86_64-pc-linux-gnu-haswell",FP64,64,16,2,0

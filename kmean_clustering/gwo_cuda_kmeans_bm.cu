@@ -284,12 +284,9 @@ __global__ void reduce_top3_stage2(const PairFI* cand, int N3,
     }
 
     if (tid == 0) {
-        // We have 3 smallest in ascending: v0 (best), v1, v2 (3rd best)
-        // OpenMP getBestKWolves pops from heap top -> largest among kept (descending).
-        // So leader order for update is: [0]=largest among top3 (v2), [1]=v1, [2]=v0
-        best3_idx_out[0] = sdata[0].v2.i; // largest among top3
-        best3_idx_out[1] = sdata[0].v1.i;
-        best3_idx_out[2] = sdata[0].v0.i; // smallest among top3
+        best3_idx_out[0] = sdata[0].v0.i; // alpha (best)
+        best3_idx_out[1] = sdata[0].v1.i; // beta
+        best3_idx_out[2] = sdata[0].v2.i; // delta
     }
 }
 
@@ -300,9 +297,10 @@ __global__ void gather_leaders_kernel(const double* pos, int NDIM,
     int d = blockIdx.x * blockDim.x + threadIdx.x;
     if (d >= NDIM) return;
 
-    int i0 = best3_idx[0]; // largest among top3
-    int i1 = best3_idx[1];
-    int i2 = best3_idx[2]; // smallest among top3
+    int i0 = best3_idx[0]; // alpha
+    int i1 = best3_idx[1]; // beta
+    int i2 = best3_idx[2]; // delta
+
 
     L0[d] = pos[(size_t)i0 * NDIM + d];
     L1[d] = pos[(size_t)i1 * NDIM + d];
@@ -362,7 +360,8 @@ int main() {
     const int MAX_ITERS = 100;
     const uint64_t SEED = 123456789ULL;
 
-    std::vector<int> Pop_list = {25, 50, 100, 200};
+    // std::vector<int> Pop_list = {25, 50, 100, 200};
+    std::vector<int> Pop_list = {400, 800};
 
     MNIST train = load_mnist_images_labels(
         "./mnist/train-images-idx3-ubyte",
