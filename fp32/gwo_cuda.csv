@@ -1,0 +1,4 @@
+impl,limit_train,Ndata,D,K,NDIM,POP_SIZE,max_iters,runs,avg_ms,best_sse,device
+cuda,5000,5000,784,10,7840,25,100,1,7791,349761,NVIDIA GeForce RTX 3050 Ti Laptop GPU
+cuda,5000,5000,784,10,7840,50,100,1,17130,337867,NVIDIA GeForce RTX 3050 Ti Laptop GPU
+cuda,5000,5000,784,10,7840,100,100,1,35489,324974,NVIDIA GeForce RTX 3050 Ti Laptop GPU

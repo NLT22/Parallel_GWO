@@ -127,149 +127,147 @@ int main() {
     using clock = std::chrono::steady_clock;
 
     // ===================== CONFIG =====================
-    const int LIMIT_TRAIN = 1000;
+    std::vector<int> Limit_list = {1000, 5000};   
     const int K = 10;
     const int RUNS = 1;
     const int MAX_ITERS = 100;
     const uint64_t SEED = 123456789ULL;
 
-    // std::vector<int> Pop_list = {32, 64, 128};
-    std::vector<int> Pop_list = {1000};
-
-    // ===================== Load MNIST (timed) =====================
-    auto t_load0 = clock::now();
-    MNIST train = load_mnist_images_labels(
-        "./mnist/train-images-idx3-ubyte",
-        "./mnist/train-labels-idx1-ubyte",
-        LIMIT_TRAIN
-    );
-    auto t_load1 = clock::now();
-    long long mnist_load_ms = ms_since(t_load0, t_load1);
-
-    const int D = train.dim();
-    const int Ndata = train.n;
-
-    std::cout << "Loaded MNIST: N=" << Ndata << ", D=" << D
-              << " (" << train.rows << "x" << train.cols << ")"
-              << " | load=" << mnist_load_ms << " ms\n";
+    std::vector<int> Pop_list = {32, 128, 512};
 
     // ===================== CSV =====================
     std::string filename = "gwo_serial.csv";
     bool need_header = (!std::filesystem::exists(filename) ||
                         std::filesystem::file_size(filename) == 0);
 
-    for (int POP_SIZE : Pop_list) {
-        // setup-only timing (not including Problem ctor)
-        auto t_setup0 = clock::now();
-        GWO::Setup setup;
-        setup.N = (size_t)(K * D);
-        setup.POP_SIZE = (size_t)POP_SIZE;
-        setup.minRange = Eigen::ArrayXd::Constant((int)setup.N, 0.0);
-        setup.maxRange = Eigen::ArrayXd::Constant((int)setup.N, 1.0);
-        auto t_setup1 = clock::now();
-        long long setup_only_ms = ms_since(t_setup0, t_setup1);
+    for (int LIMIT_TRAIN : Limit_list) {
 
-        long long total_run_ms = 0;
-        long long total_setup_problem_ms = 0;
-        double best_last = 0.0;
+        // ===================== Load MNIST (timed) =====================
+        auto t_load0 = clock::now();
+        MNIST train = load_mnist_images_labels(
+            "./mnist/train-images-idx3-ubyte",
+            "./mnist/train-labels-idx1-ubyte",
+            LIMIT_TRAIN
+        );
+        auto t_load1 = clock::now();
+        long long mnist_load_ms = ms_since(t_load0, t_load1);
 
-        // aggregated exclusive profiling (per RUNS)
-        uint64_t sum_update_fitness_excl_ms = 0;
-        uint64_t sum_update_pop_excl_ms     = 0;
-        uint64_t sum_fitness_batch_excl_ms  = 0;
-        uint64_t sum_fitness_scalar_ms      = 0;
-        uint64_t sum_fitness_calls          = 0;
+        const int D = train.dim();
+        const int Ndata = train.n;
 
-        std::cout << "================================\n";
-        std::cout << "Serial GWO | KMeans(MNIST)"
-                  << " | Ndata=" << Ndata
-                  << " | D=" << D
-                  << " | K=" << K
-                  << " | POP=" << POP_SIZE
-                  << " | ITERS=" << MAX_ITERS << "\n";
+        std::cout << "\n================================\n";
+        std::cout << "Loaded MNIST: limit=" << LIMIT_TRAIN
+                  << " | N=" << Ndata << ", D=" << D
+                  << " (" << train.rows << "x" << train.cols << ")"
+                  << " | load=" << mnist_load_ms << " ms\n";
 
-        for (int r = 1; r <= RUNS; ++r) {
-            GWO::global_seed = SEED;
-            GWO::Profiler::reset();
+        for (int POP_SIZE : Pop_list) {
+            // setup-only timing (not including Problem ctor)
+            auto t_setup0 = clock::now();
+            GWO::Setup setup;
+            setup.N = (size_t)(K * D);
+            setup.POP_SIZE = (size_t)POP_SIZE;
+            setup.minRange = Eigen::ArrayXd::Constant((int)setup.N, 0.0);
+            setup.maxRange = Eigen::ArrayXd::Constant((int)setup.N, 1.0);
+            auto t_setup1 = clock::now();
+            long long setup_only_ms = ms_since(t_setup0, t_setup1);
 
-            auto t_prob0 = clock::now();
-            KMeansProblemCPU problem(setup, train.X.data(), Ndata, D, K);
-            auto t_prob1 = clock::now();
-            long long setup_problem_ms = ms_since(t_prob0, t_prob1);
-            total_setup_problem_ms += setup_problem_ms;
+            long long total_run_ms = 0;
+            long long total_setup_problem_ms = 0;
+            double best_last = 0.0;
 
-            auto t0 = clock::now();
-            auto best = problem.run(MAX_ITERS);
-            auto t1 = clock::now();
-            long long run_ms = ms_since(t0, t1);
+            // aggregated exclusive profiling (per RUNS)
+            uint64_t sum_update_fitness_excl_ms = 0;
+            uint64_t sum_update_pop_excl_ms     = 0;
+            uint64_t sum_fitness_batch_excl_ms  = 0;
+            uint64_t sum_fitness_scalar_ms      = 0;
+            uint64_t sum_fitness_calls          = 0;
 
-            total_run_ms += run_ms;
-            best_last = best.savedFitness;
+            std::cout << "--------------------------------\n";
+            std::cout << "Serial GWO | KMeans(MNIST)"
+                      << " | limit=" << LIMIT_TRAIN
+                      << " | Ndata=" << Ndata
+                      << " | D=" << D
+                      << " | K=" << K
+                      << " | POP=" << POP_SIZE
+                      << " | ITERS=" << MAX_ITERS << "\n";
 
-            // collect EXCLUSIVE counters
-            sum_update_fitness_excl_ms += GWO::Profiler::t_update_fitness_excl_ms;
-            sum_update_pop_excl_ms     += GWO::Profiler::t_update_pop_excl_ms;
-            sum_fitness_batch_excl_ms  += GWO::Profiler::t_fitness_batch_excl_ms;
-            sum_fitness_scalar_ms      += GWO::Profiler::t_fitness_scalar_ms;
-            sum_fitness_calls          += GWO::Profiler::n_fitness_calls;
+            for (int r = 1; r <= RUNS; ++r) {
+                GWO::global_seed = SEED;
+                GWO::Profiler::reset();
 
-            std::cout << "Run " << r
-                      << " | setup_problem=" << setup_problem_ms << " ms"
-                      << " | run=" << run_ms << " ms"
-                      << " | best SSE=" << best_last
-                      << " | fitness_calls=" << (uint64_t)GWO::Profiler::n_fitness_calls
-                      << "\n";
+                auto t_prob0 = clock::now();
+                KMeansProblemCPU problem(setup, train.X.data(), Ndata, D, K);
+                auto t_prob1 = clock::now();
+                long long setup_problem_ms = ms_since(t_prob0, t_prob1);
+                total_setup_problem_ms += setup_problem_ms;
+
+                auto t0 = clock::now();
+                auto best = problem.run(MAX_ITERS);
+                auto t1 = clock::now();
+                long long run_ms = ms_since(t0, t1);
+
+                total_run_ms += run_ms;
+                best_last = best.savedFitness;
+
+                // collect EXCLUSIVE counters
+                sum_update_fitness_excl_ms += GWO::Profiler::t_update_fitness_excl_ms;
+                sum_update_pop_excl_ms     += GWO::Profiler::t_update_pop_excl_ms;
+                sum_fitness_batch_excl_ms  += GWO::Profiler::t_fitness_batch_excl_ms;
+                sum_fitness_scalar_ms      += GWO::Profiler::t_fitness_scalar_ms;
+                sum_fitness_calls          += GWO::Profiler::n_fitness_calls;
+
+                std::cout << "Run " << r
+                          << " | setup_problem=" << setup_problem_ms << " ms"
+                          << " | run=" << run_ms << " ms"
+                          << " | best SSE=" << best_last
+                          << " | fitness_calls=" << (uint64_t)GWO::Profiler::n_fitness_calls
+                          << "\n";
+            }
+
+            double avg_run_ms = total_run_ms / double(RUNS);
+            double avg_setup_problem_ms = total_setup_problem_ms / double(RUNS);
+
+            double avg_update_fitness_excl_ms = sum_update_fitness_excl_ms / double(RUNS);
+            double avg_update_pop_excl_ms     = sum_update_pop_excl_ms     / double(RUNS);
+            double avg_fitness_batch_excl_ms  = sum_fitness_batch_excl_ms  / double(RUNS);
+            double avg_fitness_scalar_ms      = sum_fitness_scalar_ms      / double(RUNS);
+            double avg_fitness_calls          = (double)sum_fitness_calls  / double(RUNS);
+
+            std::cout << "Avg: run=" << avg_run_ms
+                      << " ms | setup_problem=" << avg_setup_problem_ms << " ms\n";
+
+            std::ofstream csv(filename, std::ios::app);
+            if (!csv) {
+                std::cerr << "Cannot open csv: " << filename << "\n";
+                return 1;
+            }
+
+            if (need_header) {
+                csv
+                  << "impl,limit_train,Ndata,D,K,POP_SIZE,max_iters,avg_ms,best_sse,"
+                  << "mnist_load_ms,setup_only_ms,avg_setup_problem_ms,"
+                  << "avg_update_pop_excl_ms,avg_update_fitness_excl_ms,avg_fitness_batch_excl_ms,avg_fitness_scalar_ms,avg_fitness_calls\n";
+                need_header = false;
+            }
+
+            csv << "serial"
+                << "," << LIMIT_TRAIN
+                << "," << Ndata << "," << D << "," << K
+                << "," << POP_SIZE
+                << "," << MAX_ITERS
+                << "," << avg_run_ms
+                << "," << best_last
+                << "," << mnist_load_ms
+                << "," << setup_only_ms
+                << "," << avg_setup_problem_ms
+                << "," << avg_update_pop_excl_ms
+                << "," << avg_update_fitness_excl_ms
+                << "," << avg_fitness_batch_excl_ms
+                << "," << avg_fitness_scalar_ms
+                << "," << (uint64_t)avg_fitness_calls
+                << "\n";
         }
-
-        double avg_run_ms = total_run_ms / double(RUNS);
-        double avg_setup_problem_ms = total_setup_problem_ms / double(RUNS);
-
-        double avg_update_fitness_excl_ms = sum_update_fitness_excl_ms / double(RUNS);
-        double avg_update_pop_excl_ms     = sum_update_pop_excl_ms     / double(RUNS);
-        double avg_fitness_batch_excl_ms  = sum_fitness_batch_excl_ms  / double(RUNS);
-        double avg_fitness_scalar_ms      = sum_fitness_scalar_ms      / double(RUNS);
-        double avg_fitness_calls          = (double)sum_fitness_calls  / double(RUNS);
-
-        std::cout << "Avg: run=" << avg_run_ms
-                  << " ms | setup_problem=" << avg_setup_problem_ms << " ms\n";
-        std::cout << "EXCL Profile(avg):\n"
-                  << "  update_pop_excl=" << avg_update_pop_excl_ms << " ms\n"
-                  << "  update_fitness_excl=" << avg_update_fitness_excl_ms << " ms\n"
-                  << "  fitness_batch_excl=" << avg_fitness_batch_excl_ms << " ms\n"
-                  << "  fitness_scalar=" << avg_fitness_scalar_ms << " ms\n"
-                  << "  fitness_calls=" << (uint64_t)avg_fitness_calls << "\n";
-
-        std::ofstream csv(filename, std::ios::app);
-        if (!csv) {
-            std::cerr << "Cannot open csv: " << filename << "\n";
-            return 1;
-        }
-
-        if (need_header) {
-            csv
-              << "impl,limit_train,Ndata,D,K,POP_SIZE,max_iters,avg_ms,best_sse,"
-              << "mnist_load_ms,setup_only_ms,avg_setup_problem_ms,"
-              << "avg_update_pop_excl_ms,avg_update_fitness_excl_ms,avg_fitness_batch_excl_ms,avg_fitness_scalar_ms,avg_fitness_calls\n";
-            need_header = false;
-        }
-
-        csv << "serial"
-            << "," << LIMIT_TRAIN
-            << "," << Ndata << "," << D << "," << K
-            << "," << POP_SIZE
-            << "," << MAX_ITERS
-            << "," << avg_run_ms
-            << "," << best_last
-            << "," << mnist_load_ms
-            << "," << setup_only_ms
-            << "," << avg_setup_problem_ms
-            << "," << avg_update_pop_excl_ms
-            << "," << avg_update_fitness_excl_ms
-            << "," << avg_fitness_batch_excl_ms
-            << "," << avg_fitness_scalar_ms
-            << "," << (uint64_t)avg_fitness_calls
-            << "\n";
-        csv.close();
     }
 
     return 0;

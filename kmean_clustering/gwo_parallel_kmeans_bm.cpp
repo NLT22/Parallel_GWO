@@ -125,28 +125,16 @@ struct KMeansProblemCPU_OMP : public GWO::Problem<double> {
 
 int main() {
     // ===================== CONFIG =====================
-    const int LIMIT_TRAIN = 5000; // tăng lên 60000 nếu muốn nặng hơn
+    std::vector<int> LIMIT_list = {1000, 5000};   
     const int K = 10;
     const int RUNS = 1;
     const int MAX_ITERS = 100;
     const uint64_t SEED = 123456789ULL;
 
-    std::vector<int> Pop_list = {32, 64, 128};
+    std::vector<int> Pop_list = {32, 128, 512};
     std::vector<int> thread_list = {2, 4, 8, 16, 20};
 
-    // ===================== Load MNIST =====================
-    MNIST train = load_mnist_images_labels(
-        "./mnist/train-images-idx3-ubyte",
-        "./mnist/train-labels-idx1-ubyte",
-        LIMIT_TRAIN
-    );
-    const int D = train.dim();
-    const int Ndata = train.n;
-
-    std::cout << "Loaded MNIST: N=" << Ndata << ", D=" << D << " ("
-              << train.rows << "x" << train.cols << ")\n";
-
-    // ===================== CSV =====================
+    // ===================== CSV (open once) =====================
     std::string filename = "gwo_openmp.csv";
     bool need_header = (!std::filesystem::exists(filename) ||
                         std::filesystem::file_size(filename) == 0);
@@ -160,60 +148,78 @@ int main() {
         csv << "impl,limit_train,Ndata,D,K,POP_SIZE,threads,max_iters,avg_ms,best_sse\n";
     }
 
-    for (int POP_SIZE : Pop_list) {
-        GWO::Setup setup;
-        setup.N = (size_t)(K * D);
-        setup.POP_SIZE = (size_t)POP_SIZE;
-        setup.minRange = Eigen::ArrayXd::Constant((int)setup.N, 0.0);
-        setup.maxRange = Eigen::ArrayXd::Constant((int)setup.N, 1.0);
+    // ===================== Loop over LIMIT_TRAIN =====================
+    for (int LIMIT_TRAIN : LIMIT_list) {
+        // ===================== Load MNIST =====================
+        MNIST train = load_mnist_images_labels(
+            "./mnist/train-images-idx3-ubyte",
+            "./mnist/train-labels-idx1-ubyte",
+            LIMIT_TRAIN
+        );
+        const int D = train.dim();
+        const int Ndata = train.n;
 
-        for (int threads : thread_list) {
-            #ifdef _OPENMP
-            omp_set_dynamic(0);
-            omp_set_num_threads(threads);
-            omp_set_nested(0);
-            #endif
+        std::cout << "\n====================================================\n";
+        std::cout << "Loaded MNIST: LIMIT=" << LIMIT_TRAIN
+                  << " | N=" << Ndata << ", D=" << D << " ("
+                  << train.rows << "x" << train.cols << ")\n";
 
-            long long total_ms = 0;
-            double best_last = 0.0;
+        // ===================== Runs =====================
+        for (int POP_SIZE : Pop_list) {
+            GWO::Setup setup;
+            setup.N = (size_t)(K * D);
+            setup.POP_SIZE = (size_t)POP_SIZE;
+            setup.minRange = Eigen::ArrayXd::Constant((int)setup.N, 0.0);
+            setup.maxRange = Eigen::ArrayXd::Constant((int)setup.N, 1.0);
 
-            std::cout << "================================\n";
-            std::cout << "OpenMP GWO | KMeans(MNIST)"
-                      << " | Ndata=" << Ndata
-                      << " | D=" << D
-                      << " | K=" << K
-                      << " | POP=" << POP_SIZE
-                      << " | threads=" << threads
-                      << " | ITERS=" << MAX_ITERS << "\n";
+            for (int threads : thread_list) {
+                #ifdef _OPENMP
+                omp_set_dynamic(0);
+                omp_set_num_threads(threads);
+                omp_set_nested(0);
+                #endif
 
-            for (int r = 1; r <= RUNS; ++r) {
-                GWO::global_seed = SEED;
-                KMeansProblemCPU_OMP problem(setup, train.X.data(), Ndata, D, K);
+                long long total_ms = 0;
+                double best_last = 0.0;
 
-                auto t0 = std::chrono::steady_clock::now();
-                auto best = problem.run(MAX_ITERS);
-                auto t1 = std::chrono::steady_clock::now();
+                std::cout << "--------------------------------\n";
+                std::cout << "OpenMP GWO | LIMIT=" << LIMIT_TRAIN
+                          << " | Ndata=" << Ndata
+                          << " | D=" << D
+                          << " | K=" << K
+                          << " | POP=" << POP_SIZE
+                          << " | threads=" << threads
+                          << " | ITERS=" << MAX_ITERS << "\n";
 
-                long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-                total_ms += ms;
-                best_last = best.savedFitness;
+                for (int r = 1; r <= RUNS; ++r) {
+                    GWO::global_seed = SEED;
+                    KMeansProblemCPU_OMP problem(setup, train.X.data(), Ndata, D, K);
 
-                std::cout << "Run " << r << " | " << ms << " ms | best SSE=" << best_last << "\n";
+                    auto t0 = std::chrono::steady_clock::now();
+                    auto best = problem.run(MAX_ITERS);
+                    auto t1 = std::chrono::steady_clock::now();
+
+                    long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+                    total_ms += ms;
+                    best_last = best.savedFitness;
+
+                    std::cout << "Run " << r << " | " << ms << " ms | best SSE=" << best_last << "\n";
+                }
+
+                double avg_ms = total_ms / double(RUNS);
+                std::cout << "Avg: " << avg_ms << " ms\n";
+
+                csv << "openmp"
+                    << "," << LIMIT_TRAIN
+                    << "," << Ndata << "," << D << "," << K
+                    << "," << POP_SIZE
+                    << "," << threads
+                    << "," << MAX_ITERS
+                    << "," << avg_ms
+                    << "," << best_last
+                    << "\n";
+                csv.flush();
             }
-
-            double avg_ms = total_ms / double(RUNS);
-            std::cout << "Avg: " << avg_ms << " ms\n";
-
-            csv << "openmp"
-                << "," << LIMIT_TRAIN
-                << "," << Ndata << "," << D << "," << K
-                << "," << POP_SIZE
-                << "," << threads
-                << "," << MAX_ITERS
-                << "," << avg_ms
-                << "," << best_last
-                << "\n";
-            csv.flush();
         }
     }
 

@@ -335,25 +335,13 @@ __global__ void gwo_update_kernel(double* pos, int POP, int NDIM,
 // ===================== Main =====================
 int main() {
     // Config
-    const int LIMIT_TRAIN = 5000;
+    std::vector<int> LIMIT_list = {1000, 5000};  
     const int K = 10;
     const int RUNS = 1;
     const int MAX_ITERS = 100;
     const uint64_t SEED = 123456789ULL;
 
-    std::vector<int> Pop_list = {32, 64, 128};
-
-    MNIST train = load_mnist_images_labels(
-        "./mnist/train-images-idx3-ubyte",
-        "./mnist/train-labels-idx1-ubyte",
-        LIMIT_TRAIN
-    );
-
-    const int D = train.dim();
-    const int Ndata = train.n;
-    const int NDIM = K * D;
-
-    std::cout << "Loaded MNIST: N=" << Ndata << ", D=" << D << " (" << train.rows << "x" << train.cols << "), NDIM=" << NDIM << "\n";
+    std::vector<int> Pop_list = {32, 128, 512};
 
     int dev = 0;
     cudaDeviceProp prop{};
@@ -361,159 +349,183 @@ int main() {
     cuda_check(cudaGetDeviceProperties(&prop, dev), "GetDeviceProperties");
     std::cout << "CUDA Device: " << prop.name << "\n";
 
-    // copy X once
-    float* d_X = nullptr;
-    size_t bytesX = (size_t)Ndata * (size_t)D * sizeof(float);
-    cuda_check(cudaMalloc((void**)&d_X, bytesX), "Malloc d_X");
-    cuda_check(cudaMemcpy(d_X, train.X.data(), bytesX, cudaMemcpyHostToDevice), "Memcpy X");
-
     std::string filename = "gwo_cuda.csv";
     bool need_header = (!std::filesystem::exists(filename) ||
                         std::filesystem::file_size(filename) == 0);
 
-    for (int POP : Pop_list) {
-        std::cout << "================================\n";
-        std::cout << "CUDA FULL (match OpenMP) | POP=" << POP
-                  << " | ITERS=" << MAX_ITERS
-                  << " | Ndata=" << Ndata
-                  << " | K=" << K << "\n";
+    for (int LIMIT_TRAIN : LIMIT_list) {
+        // Load MNIST per LIMIT
+        MNIST train = load_mnist_images_labels(
+            "./mnist/train-images-idx3-ubyte",
+            "./mnist/train-labels-idx1-ubyte",
+            LIMIT_TRAIN
+        );
 
-        // allocate
-        double* d_pos = nullptr;   // [POP * NDIM]
-        double* d_sse = nullptr;   // [POP]
-        double* d_L0 = nullptr;    // [NDIM]
-        double* d_L1 = nullptr;
-        double* d_L2 = nullptr;
-        int*    d_best3 = nullptr; // [3]
+        const int D = train.dim();
+        const int Ndata = train.n;
+        const int NDIM = K * D;
 
-        size_t bytesPos = (size_t)POP * (size_t)NDIM * sizeof(double);
-        size_t bytesSse = (size_t)POP * sizeof(double);
-        size_t bytesVec = (size_t)NDIM * sizeof(double);
+        std::cout << "\n================================\n";
+        std::cout << "Loaded MNIST: limit=" << LIMIT_TRAIN
+                  << " | N=" << Ndata << ", D=" << D
+                  << " (" << train.rows << "x" << train.cols << ")"
+                  << " | NDIM=" << NDIM << "\n";
 
-        cuda_check(cudaMalloc((void**)&d_pos, bytesPos), "Malloc d_pos");
-        cuda_check(cudaMalloc((void**)&d_sse, bytesSse), "Malloc d_sse");
-        cuda_check(cudaMalloc((void**)&d_L0, bytesVec), "Malloc d_L0");
-        cuda_check(cudaMalloc((void**)&d_L1, bytesVec), "Malloc d_L1");
-        cuda_check(cudaMalloc((void**)&d_L2, bytesVec), "Malloc d_L2");
-        cuda_check(cudaMalloc((void**)&d_best3, 3 * sizeof(int)), "Malloc d_best3");
+        // copy X per LIMIT (because Ndata changes)
+        float* d_X = nullptr;
+        size_t bytesX = (size_t)Ndata * (size_t)D * sizeof(float);
+        cuda_check(cudaMalloc((void**)&d_X, bytesX), "Malloc d_X");
+        cuda_check(cudaMemcpy(d_X, train.X.data(), bytesX, cudaMemcpyHostToDevice), "Memcpy X");
 
-        // init pos 
-        {
-            int threads = 256;
-            int total = POP * NDIM;
-            int blocks = (total + threads - 1) / threads;
-            init_pos_kernel<<<blocks, threads>>>(d_pos, POP, NDIM, SEED);
-            cuda_check(cudaGetLastError(), "init_pos_kernel");
-            cuda_check(cudaDeviceSynchronize(), "sync init");
-        }
+        for (int POP : Pop_list) {
+            std::cout << "--------------------------------\n";
+            std::cout << "CUDA FULL (match OpenMP) | limit=" << LIMIT_TRAIN
+                      << " | POP=" << POP
+                      << " | ITERS=" << MAX_ITERS
+                      << " | Ndata=" << Ndata
+                      << " | K=" << K << "\n";
 
-        // reduction buffers
-        const int reduceBlock = 256;
-        int nb = (POP + reduceBlock - 1) / reduceBlock;
-        nb = std::max(1, nb);
-        PairFI* d_cand = nullptr;
-        cuda_check(cudaMalloc((void**)&d_cand, (size_t)nb * 3 * sizeof(PairFI)), "Malloc d_cand");
+            // allocate per POP
+            double* d_pos = nullptr;   // [POP * NDIM]
+            double* d_sse = nullptr;   // [POP]
+            double* d_L0 = nullptr;    // [NDIM]
+            double* d_L1 = nullptr;
+            double* d_L2 = nullptr;
+            int*    d_best3 = nullptr; // [3]
 
-        long long total_ms = 0;
-        double best_last = 0.0;
+            size_t bytesPos = (size_t)POP * (size_t)NDIM * sizeof(double);
+            size_t bytesSse = (size_t)POP * sizeof(double);
+            size_t bytesVec = (size_t)NDIM * sizeof(double);
 
-        for (int r = 1; r <= RUNS; ++r) {
-            auto t0 = std::chrono::steady_clock::now();
+            cuda_check(cudaMalloc((void**)&d_pos, bytesPos), "Malloc d_pos");
+            cuda_check(cudaMalloc((void**)&d_sse, bytesSse), "Malloc d_sse");
+            cuda_check(cudaMalloc((void**)&d_L0, bytesVec), "Malloc d_L0");
+            cuda_check(cudaMalloc((void**)&d_L1, bytesVec), "Malloc d_L1");
+            cuda_check(cudaMalloc((void**)&d_L2, bytesVec), "Malloc d_L2");
+            cuda_check(cudaMalloc((void**)&d_best3, 3 * sizeof(int)), "Malloc d_best3");
 
-            for (int iter = 0; iter < MAX_ITERS; ++iter) {
-                // fitness
-                cuda_check(cudaMemset(d_sse, 0, bytesSse), "memset d_sse");
-
-                const int threads = 256;
-                int blocksX = (Ndata + threads - 1) / threads;
-                dim3 grid(blocksX, POP, 1);
-                dim3 block(threads, 1, 1);
-                size_t shmem = (size_t)threads * sizeof(double);
-
-                kmeans_sse_pop_kernel<<<grid, block, shmem>>>(d_X, Ndata, D, d_pos, K, POP, d_sse);
-                cuda_check(cudaGetLastError(), "kmeans_sse_pop_kernel");
-
-                // top3 (match heap semantics)
-                reduce_top3_stage1<<<nb, reduceBlock, (size_t)reduceBlock * sizeof(Top3Small)>>>(d_sse, POP, d_cand);
-                cuda_check(cudaGetLastError(), "reduce_top3_stage1");
-
-                int t2 = 256;
-                reduce_top3_stage2<<<1, t2, (size_t)t2 * sizeof(Top3Small)>>>(d_cand, nb * 3, d_best3);
-                cuda_check(cudaGetLastError(), "reduce_top3_stage2");
-
-                // gather leaders in OpenMP order [largest among top3, mid, smallest]
-                int gthreads = 256;
-                int gblocks = (NDIM + gthreads - 1) / gthreads;
-                gather_leaders_kernel<<<gblocks, gthreads>>>(d_pos, NDIM, d_best3, d_L0, d_L1, d_L2);
-                cuda_check(cudaGetLastError(), "gather_leaders_kernel");
-
-                // update
-                double a = 2.0 * (1.0 - (double)iter / (double)MAX_ITERS);
-                dim3 ugrid(POP, (NDIM + 255) / 256, 1);
-                dim3 ublock(256, 1, 1);
-                gwo_update_kernel<<<ugrid, ublock>>>(d_pos, POP, NDIM, d_L0, d_L1, d_L2, a, iter, SEED);
-                cuda_check(cudaGetLastError(), "gwo_update_kernel");
+            // init pos
+            {
+                int threads = 256;
+                int total = POP * NDIM;
+                int blocks = (total + threads - 1) / threads;
+                init_pos_kernel<<<blocks, threads>>>(d_pos, POP, NDIM, SEED);
+                cuda_check(cudaGetLastError(), "init_pos_kernel");
+                cuda_check(cudaDeviceSynchronize(), "sync init");
             }
 
-            cuda_check(cudaDeviceSynchronize(), "sync end run");
+            // reduction buffers per POP
+            const int reduceBlock = 256;
+            int nb = (POP + reduceBlock - 1) / reduceBlock;
+            nb = std::max(1, nb);
+            PairFI* d_cand = nullptr;
+            cuda_check(cudaMalloc((void**)&d_cand, (size_t)nb * 3 * sizeof(PairFI)), "Malloc d_cand");
 
-            int h_best3[3] = {-1,-1,-1};
-            std::vector<double> h_sse(POP);
+            long long total_ms = 0;
+            double best_last = 0.0;
 
-            cuda_check(cudaMemcpy(h_best3, d_best3, 3 * sizeof(int), cudaMemcpyDeviceToHost), "Memcpy best3");
-            cuda_check(cudaMemcpy(h_sse.data(), d_sse, bytesSse, cudaMemcpyDeviceToHost), "Memcpy sse");
+            for (int r = 1; r <= RUNS; ++r) {
+                auto t0 = std::chrono::steady_clock::now();
 
-            int idx0 = h_best3[0];
-            if (idx0 >= 0 && idx0 < POP) best_last = h_sse[(size_t)idx0];
+                for (int iter = 0; iter < MAX_ITERS; ++iter) {
+                    // fitness
+                    cuda_check(cudaMemset(d_sse, 0, bytesSse), "memset d_sse");
 
-            auto t1 = std::chrono::steady_clock::now();
-            long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-            total_ms += ms;
+                    const int threads = 256;
+                    int blocksX = (Ndata + threads - 1) / threads;
+                    dim3 grid(blocksX, POP, 1);
+                    dim3 block(threads, 1, 1);
+                    size_t shmem = (size_t)threads * sizeof(double);
 
-            std::cout << "Run " << r << " | " << ms << " ms | best SSE (OpenMP-style)=" << best_last
-                      << " | idx0=" << idx0 << "\n";
+                    kmeans_sse_pop_kernel<<<grid, block, shmem>>>(d_X, Ndata, D, d_pos, K, POP, d_sse);
+                    cuda_check(cudaGetLastError(), "kmeans_sse_pop_kernel");
+
+                    // top3
+                    reduce_top3_stage1<<<nb, reduceBlock, (size_t)reduceBlock * sizeof(Top3Small)>>>(d_sse, POP, d_cand);
+                    cuda_check(cudaGetLastError(), "reduce_top3_stage1");
+
+                    int t2 = 256;
+                    reduce_top3_stage2<<<1, t2, (size_t)t2 * sizeof(Top3Small)>>>(d_cand, nb * 3, d_best3);
+                    cuda_check(cudaGetLastError(), "reduce_top3_stage2");
+
+                    // gather leaders
+                    int gthreads = 256;
+                    int gblocks = (NDIM + gthreads - 1) / gthreads;
+                    gather_leaders_kernel<<<gblocks, gthreads>>>(d_pos, NDIM, d_best3, d_L0, d_L1, d_L2);
+                    cuda_check(cudaGetLastError(), "gather_leaders_kernel");
+
+                    // update
+                    double a = 2.0 * (1.0 - (double)iter / (double)MAX_ITERS);
+                    dim3 ugrid(POP, (NDIM + 255) / 256, 1);
+                    dim3 ublock(256, 1, 1);
+                    gwo_update_kernel<<<ugrid, ublock>>>(d_pos, POP, NDIM, d_L0, d_L1, d_L2, a, iter, SEED);
+                    cuda_check(cudaGetLastError(), "gwo_update_kernel");
+                }
+
+                cuda_check(cudaDeviceSynchronize(), "sync end run");
+
+                int h_best3[3] = {-1,-1,-1};
+                std::vector<double> h_sse(POP);
+
+                cuda_check(cudaMemcpy(h_best3, d_best3, 3 * sizeof(int), cudaMemcpyDeviceToHost), "Memcpy best3");
+                cuda_check(cudaMemcpy(h_sse.data(), d_sse, bytesSse, cudaMemcpyDeviceToHost), "Memcpy sse");
+
+                int idx0 = h_best3[0];
+                if (idx0 >= 0 && idx0 < POP) best_last = h_sse[(size_t)idx0];
+
+                auto t1 = std::chrono::steady_clock::now();
+                long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+                total_ms += ms;
+
+                std::cout << "Run " << r
+                          << " | " << ms << " ms"
+                          << " | best SSE(OpenMP-style)=" << best_last
+                          << " | idx0=" << idx0 << "\n";
+            }
+
+            double avg_ms = total_ms / double(RUNS);
+            std::cout << "Avg: " << avg_ms << " ms\n";
+
+            // CSV
+            {
+                std::ofstream csv(filename, std::ios::app);
+                if (!csv) {
+                    std::cerr << "Cannot open csv: " << filename << "\n";
+                    return 1;
+                }
+                if (need_header) {
+                    csv << "impl,limit_train,Ndata,D,K,NDIM,POP_SIZE,max_iters,runs,avg_ms,best_sse,device\n";
+                    need_header = false;
+                }
+
+                csv << "cuda"
+                    << "," << LIMIT_TRAIN
+                    << "," << Ndata
+                    << "," << D
+                    << "," << K
+                    << "," << NDIM
+                    << "," << POP
+                    << "," << MAX_ITERS
+                    << "," << RUNS
+                    << "," << avg_ms
+                    << "," << best_last
+                    << "," << prop.name
+                    << "\n";
+            }
+
+            // free per POP
+            cudaFree(d_cand);
+            cudaFree(d_best3);
+            cudaFree(d_L2);
+            cudaFree(d_L1);
+            cudaFree(d_L0);
+            cudaFree(d_sse);
+            cudaFree(d_pos);
         }
 
-        double avg_ms = total_ms / double(RUNS);
-        std::cout << "Avg: " << avg_ms << " ms\n";
-
-        // CSV
-        {
-            std::ofstream csv(filename, std::ios::app);
-            if (!csv) {
-                std::cerr << "Cannot open csv: " << filename << "\n";
-                return 1;
-            }
-            if (need_header) {
-                csv << "impl,limit_train,Ndata,D,K,NDIM,POP_SIZE,max_iters,runs,avg_ms,best_sse,device\n";
-                need_header = false;
-            }
-            csv << "cuda"
-                << "," << LIMIT_TRAIN
-                << "," << Ndata
-                << "," << D
-                << "," << K
-                << "," << NDIM
-                << "," << POP
-                << "," << MAX_ITERS
-                << "," << RUNS
-                << "," << avg_ms
-                << "," << best_last
-                << "," << prop.name
-                << "\n";
-        }
-
-        // free
-        cudaFree(d_cand);
-        cudaFree(d_best3);
-        cudaFree(d_L2);
-        cudaFree(d_L1);
-        cudaFree(d_L0);
-        cudaFree(d_sse);
-        cudaFree(d_pos);
+        cudaFree(d_X);
     }
 
-    cudaFree(d_X);
     std::cout << "Done. CSV: " << filename << "\n";
     return 0;
 }

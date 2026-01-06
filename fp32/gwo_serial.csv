@@ -1,0 +1,4 @@
+impl,limit_train,Ndata,D,K,POP_SIZE,max_iters,avg_ms,best_sse,mnist_load_ms,setup_only_ms,avg_setup_problem_ms,avg_update_pop_excl_ms,avg_update_fitness_excl_ms,avg_fitness_batch_excl_ms,avg_fitness_scalar_ms,avg_fitness_calls
+serial,5000,5000,784,10,25,100,41841,349735,8,0,0,130,22,892,40743,2525
+serial,5000,5000,784,10,50,100,83044,337031,8,0,1,276,50,1451,81222,5050
+serial,5000,5000,784,10,100,100,164439,324880,8,0,1,523,103,2128,161631,10100
