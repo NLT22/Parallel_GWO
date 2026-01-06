@@ -1,4 +1,3 @@
-// gwo_parallel_sync.hpp
 #ifndef GWO_PARALLEL_SYNC_HPP
 #define GWO_PARALLEL_SYNC_HPP
 
@@ -9,7 +8,6 @@
 #include <Eigen/Dense>
 #include <stdexcept>
 #include <cstdint>
-#include <algorithm>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -65,18 +63,14 @@ namespace GWO
     };
 
     template <std::floating_point T>
-    static inline bool better_min(const Wolf<T>& a, const Wolf<T>& b)
+    class Comparator
     {
-        if (a.savedFitness != b.savedFitness) return a.savedFitness < b.savedFitness;
-        return a.id < b.id;
-    }
-
-    template <std::floating_point T>
-    struct WorseFirst
-    {
-        bool operator()(const Wolf<T>& a, const Wolf<T>& b) const
+    public:
+        bool operator()(const Wolf<T> &w1, const Wolf<T> &w2)
         {
-            return better_min(a, b); // top becomes worst
+            if (w1.savedFitness != w2.savedFitness)
+                return w1.savedFitness < w2.savedFitness;
+            return w1.id < w2.id;
         }
     };
 
@@ -118,10 +112,10 @@ namespace GWO
                 T a = 2 * (1 - T(iter) / T(maxIterations));
                 updatePopulation(iter, a);
             }
-            auto leaders = getBest3WolvesSorted();
-            return leaders[0]; // alpha
+            return getBestKWolves()[0];
         }
 
+        // === KEY CHANGE #1: NO positions matrix, compute fitness directly on population[i].pos ===
         void update_fitness_and_heap()
         {
             Eigen::ArrayX<T> fitness_values((int)setup.POP_SIZE);
@@ -137,13 +131,14 @@ namespace GWO
             {
                 population[i].savedFitness = fitness_values((int)i);
                 heap.push(population[i]);
-                if (heap.size() > constants::K) heap.pop(); // pop worst among kept
+                if (heap.size() > constants::K)
+                    heap.pop();
             }
         }
 
         void updatePopulation(int iter, T a)
         {
-            auto leaders = getBest3WolvesSorted(); // [alpha,beta,delta]
+            auto bestWolves = getBestKWolves(); // K=3, copy small
 
             #ifdef _OPENMP
             #pragma omp parallel
@@ -170,8 +165,8 @@ namespace GWO
                             localC(k) = 2 * r2;
                         }
 
-                        auto D = (leaders[j].pos * localC - population[(size_t)i].pos).abs();
-                        localNext += leaders[j].pos - D * localA;
+                        auto D = (bestWolves[j].pos * localC - population[(size_t)i].pos).abs();
+                        localNext += bestWolves[j].pos - D * localA;
                     }
 
                     population[(size_t)i].pos =
@@ -184,7 +179,7 @@ namespace GWO
             update_fitness_and_heap();
         }
 
-        std::vector<Wolf<T>> getBest3WolvesSorted()
+        auto getBestKWolves()
         {
             std::vector<Wolf<T>> best;
             auto copy = heap;
@@ -193,22 +188,13 @@ namespace GWO
                 best.push_back(copy.top());
                 copy.pop();
             }
-
-            if (best.empty()) throw std::runtime_error("Heap empty");
-            while (best.size() < constants::K) best.push_back(best.back());
-
-            std::sort(best.begin(), best.end(), [](const Wolf<T>& a, const Wolf<T>& b){
-                return better_min(a, b);
-            });
-
-            if (best.size() > constants::K)
-                best.erase(best.begin() + (std::ptrdiff_t)constants::K, best.end());
-
+            while (best.size() < constants::K)
+                best.push_back(best.back());
             return best;
         }
 
         std::vector<Wolf<T>> population;
-        std::priority_queue<Wolf<T>, std::vector<Wolf<T>>, WorseFirst<T>> heap;
+        std::priority_queue<Wolf<T>, std::vector<Wolf<T>>, Comparator<T>> heap;
 
         Eigen::ArrayX<T> nextPos;
         Eigen::ArrayX<T> A;

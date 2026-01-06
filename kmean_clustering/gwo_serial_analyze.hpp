@@ -10,7 +10,6 @@
 #include <stdexcept>
 #include <cstdint>
 #include <chrono>
-#include <algorithm>
 
 namespace GWO
 {
@@ -46,9 +45,12 @@ namespace GWO
     // ===================== PROFILER (EXCLUSIVE times) =====================
     struct Profiler
     {
+        // Exclusive times in ms (nested removed)
         static inline uint64_t t_update_fitness_excl_ms = 0;
         static inline uint64_t t_update_pop_excl_ms     = 0;
         static inline uint64_t t_fitness_batch_excl_ms  = 0;
+
+        // Leaf time (no children we measure under it)
         static inline uint64_t t_fitness_scalar_ms      = 0;
 
         static inline uint64_t n_fitness_calls          = 0;
@@ -87,33 +89,28 @@ namespace GWO
         size_t len{};
     };
 
-    // Better = smaller fitness, tie by smaller id
     template <std::floating_point T>
-    static inline bool better_min(const Wolf<T>& a, const Wolf<T>& b)
+    class Comparator
     {
-        if (a.savedFitness != b.savedFitness) return a.savedFitness < b.savedFitness;
-        return a.id < b.id;
-    }
-
-    // For std::priority_queue: we want TOP = WORST among kept (max by better_min)
-    template <std::floating_point T>
-    struct WorseFirst
-    {
-        bool operator()(const Wolf<T>& a, const Wolf<T>& b) const
+    public:
+        bool operator()(const Wolf<T> &w1, const Wolf<T> &w2)
         {
-            // return true if a is BETTER than b -> then a has lower priority, so top becomes worst
-            return better_min(a, b);
+            if (w1.savedFitness != w2.savedFitness)
+                return w1.savedFitness < w2.savedFitness;
+            return w1.id < w2.id;
         }
     };
 
     template <std::floating_point T>
     struct Problem
     {
+        // Fitness batch: exclusive = total - scalar_children
         virtual Eigen::ArrayX<T> fitness_batch(const Eigen::ArrayXX<T> &population_pos) const
         {
             using clock = std::chrono::steady_clock;
             auto t0 = clock::now();
 
+            // snapshot before scalar loop
             uint64_t scalar_before = Profiler::t_fitness_scalar_ms;
 
             Eigen::ArrayX<T> fitness_values(population_pos.rows());
@@ -132,6 +129,7 @@ namespace GWO
             auto t1 = clock::now();
             uint64_t total = Profiler::ms_since(t0, t1);
 
+            // exclusive: remove scalar time
             Profiler::t_fitness_batch_excl_ms += (total > scalar_delta) ? (total - scalar_delta) : 0ULL;
 
             return fitness_values;
@@ -172,9 +170,7 @@ namespace GWO
                 T a = 2 * (1 - T(iter) / T(maxIterations));
                 updatePopulation(iter, a);
             }
-            // return alpha (best)
-            auto leaders = getBest3WolvesSorted();
-            return leaders[0];
+            return getBestKWolves()[0];
         }
 
         // update_fitness_and_heap: exclusive = total - fitness_batch_total (child)
@@ -183,6 +179,7 @@ namespace GWO
             using clock = std::chrono::steady_clock;
             auto t0 = clock::now();
 
+            // snapshot child-related counters to compute delta
             uint64_t scalar_before = Profiler::t_fitness_scalar_ms;
             uint64_t batch_excl_before = Profiler::t_fitness_batch_excl_ms;
 
@@ -198,12 +195,13 @@ namespace GWO
                 population[i].savedFitness = fitness_values((int)i);
                 heap.push(population[i]);
                 if (heap.size() > constants::K)
-                    heap.pop(); // pop WORST among kept
+                    heap.pop();
             }
 
             auto t1 = clock::now();
             uint64_t total = Profiler::ms_since(t0, t1);
 
+            // child total = scalar_delta + batch_excl_delta
             uint64_t scalar_delta = Profiler::t_fitness_scalar_ms - scalar_before;
             uint64_t batch_excl_delta = Profiler::t_fitness_batch_excl_ms - batch_excl_before;
             uint64_t child_total = scalar_delta + batch_excl_delta;
@@ -211,12 +209,13 @@ namespace GWO
             Profiler::t_update_fitness_excl_ms += (total > child_total) ? (total - child_total) : 0ULL;
         }
 
+        // updatePopulation: exclusive = total - update_fitness_and_heap_total (child)
         void updatePopulation(int iter, T a)
         {
             using clock = std::chrono::steady_clock;
             auto t0 = clock::now();
 
-            auto leaders = getBest3WolvesSorted(); // [alpha,beta,delta]
+            auto bestWolves = getBestKWolves();
 
             for (int wi = 0; wi < (int)setup.POP_SIZE; ++wi)
             {
@@ -232,8 +231,8 @@ namespace GWO
                         C(k) = 2 * r2;
                     }
 
-                    auto D = (leaders[j].pos * C - population[wi].pos).abs();
-                    nextPos += leaders[j].pos - D * A;
+                    auto D = (bestWolves[j].pos * C - population[wi].pos).abs();
+                    nextPos += bestWolves[j].pos - D * A;
                 }
 
                 population[wi].pos =
@@ -242,6 +241,7 @@ namespace GWO
                         .min(setup.maxRange.template cast<T>());
             }
 
+            // snapshot to compute child's total time
             uint64_t uf_before = Profiler::t_update_fitness_excl_ms;
             uint64_t batch_before = Profiler::t_fitness_batch_excl_ms;
             uint64_t scalar_before = Profiler::t_fitness_scalar_ms;
@@ -252,6 +252,7 @@ namespace GWO
             uint64_t batch_delta = Profiler::t_fitness_batch_excl_ms - batch_before;
             uint64_t scalar_delta = Profiler::t_fitness_scalar_ms - scalar_before;
 
+            // child's total = update_fitness_excl + fitness_batch_excl + scalar
             uint64_t child_total = uf_delta + batch_delta + scalar_delta;
 
             auto t1 = clock::now();
@@ -260,8 +261,7 @@ namespace GWO
             Profiler::t_update_pop_excl_ms += (total > child_total) ? (total - child_total) : 0ULL;
         }
 
-        // Return [alpha,beta,delta] sorted by (fitness asc, id asc)
-        std::vector<Wolf<T>> getBest3WolvesSorted()
+        auto getBestKWolves()
         {
             std::vector<Wolf<T>> best;
             auto copy = heap;
@@ -270,23 +270,13 @@ namespace GWO
                 best.push_back(copy.top());
                 copy.pop();
             }
-
-            if (best.empty()) throw std::runtime_error("Heap empty");
-            while (best.size() < constants::K) best.push_back(best.back());
-
-            std::sort(best.begin(), best.end(), [](const Wolf<T>& a, const Wolf<T>& b){
-                return better_min(a, b);
-            });
-
-            if (best.size() > constants::K)
-                best.erase(best.begin() + (std::ptrdiff_t)constants::K, best.end());
-
+            while (best.size() < constants::K)
+                best.push_back(best.back());
             return best;
         }
 
         std::vector<Wolf<T>> population;
-        std::priority_queue<Wolf<T>, std::vector<Wolf<T>>, WorseFirst<T>> heap;
-
+        std::priority_queue<Wolf<T>, std::vector<Wolf<T>>, Comparator<T>> heap;
         Eigen::ArrayX<T> nextPos;
         Eigen::ArrayX<T> A;
         Eigen::ArrayX<T> C;

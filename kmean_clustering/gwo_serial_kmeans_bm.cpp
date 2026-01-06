@@ -10,7 +10,7 @@
 #include <cmath>
 
 #include "gwo_serial_analyze.hpp"
-// Build (MSYS2):
+
 // g++ -O2 -std=c++20 gwo_serial_kmeans_bm.cpp -o serial_kmeans.exe -I ../eigen-5.0.0
 
 // ===================== MNIST IDX LOADER (embedded) =====================
@@ -23,7 +23,7 @@ static inline uint32_t read_be_u32(std::ifstream& f) {
 
 struct MNIST {
     int n = 0, rows = 0, cols = 0;
-    std::vector<float> X;      // normalized [0,1], n x (rows*cols)
+    std::vector<float> X;      // data
     std::vector<uint8_t> y;    // labels
     int dim() const { return rows * cols; }
 };
@@ -116,6 +116,7 @@ struct KMeansProblemCPU : public GWO::Problem<double> {
     }
 };
 
+// Hàm này để tính khoảng thời gian giữa hai thời điểm
 static inline long long ms_since(const std::chrono::steady_clock::time_point& a,
                                  const std::chrono::steady_clock::time_point& b)
 {
@@ -132,8 +133,8 @@ int main() {
     const int MAX_ITERS = 100;
     const uint64_t SEED = 123456789ULL;
 
-    // std::vector<int> Pop_list = {25, 50, 100, 200};
-    std::vector<int> Pop_list = {400, 800};
+    // std::vector<int> Pop_list = {32, 64, 128};
+    std::vector<int> Pop_list = {1000};
 
     // ===================== Load MNIST (timed) =====================
     auto t_load0 = clock::now();
@@ -197,10 +198,10 @@ int main() {
             long long setup_problem_ms = ms_since(t_prob0, t_prob1);
             total_setup_problem_ms += setup_problem_ms;
 
-            auto st = clock::now();
+            auto t0 = clock::now();
             auto best = problem.run(MAX_ITERS);
-            auto ed = clock::now();
-            long long run_ms = ms_since(st, ed);
+            auto t1 = clock::now();
+            long long run_ms = ms_since(t0, t1);
 
             total_run_ms += run_ms;
             best_last = best.savedFitness;

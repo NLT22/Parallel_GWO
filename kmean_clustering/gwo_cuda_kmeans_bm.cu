@@ -11,9 +11,8 @@
 
 #include <cuda_runtime.h>
 
-//  nvcc -O2 -std=c++20 gwo_cuda_kmeans_bm.cu -o cuda_kmeans.exe
+// nvcc -O2 -std=c++20 gwo_cuda_kmeans_bm.cu -o cuda_kmeans.exe
 // nvcc -O2 -std=c++20 -gencode arch=compute_86,code=sm_86 -o cuda_kmeans gwo_cuda_kmeans_bm.cu
-
 
 static inline void cuda_check(cudaError_t e, const char* msg) {
     if (e != cudaSuccess) {
@@ -85,12 +84,7 @@ static inline MNIST load_mnist_images_labels(const std::string& images_path,
     return ds;
 }
 
-// ===================== DEVICE RNG: match OpenMP splitmix64/indexed_random =====================
-// Must match:
-//   splitmix64(uint64_t x)
-//   indexed_random(int iter, int wid, int dim, int channel)
-// from your gwo_parallel_sync.hpp
-
+// ===================== Hàm random đồng bộ với Serial =====================
 __device__ __forceinline__ uint64_t splitmix64_dev(uint64_t x)
 {
     x += 0x9E3779B97F4A7C15ULL;
@@ -125,13 +119,11 @@ __global__ void init_pos_kernel(double* pos, int POP, int NDIM, uint64_t seed) {
     if (idx >= total) return;
     int wolf = idx / NDIM;
     int dim  = idx - wolf * NDIM;
-
-    // match OpenMP init: indexed_random(0, wid=i, dim=k, channel=77)
     double r = indexed_random_dev(0, wolf, dim, 77, seed);
     pos[idx] = r; // in [0,1)
 }
 
-// ===================== Kernel: fitness SSE for all wolves (double accumulate) =====================
+// ===================== Kernel: fitness SSE for all wolves =====================
 // X float, pos double, sse_out double
 __global__ void kmeans_sse_pop_kernel(const float* __restrict__ X,
                                       int Ndata, int D,
@@ -173,33 +165,24 @@ __global__ void kmeans_sse_pop_kernel(const float* __restrict__ X,
         __syncthreads();
     }
 
-    // atomicAdd(double*) is supported on RTX 3050 Ti (cc 8.6)
     if (tid == 0) atomicAdd(&sse_out[wolf], smem[0]);
 }
 
 // ===================== GPU Top-3 selection matching heap semantics =====================
-// OpenMP semantics:
-// - keep K=3 smallest by (fitness asc, id asc)
-// - but getBestKWolves() pops from heap top which is "largest among kept" by:
-//      (fitness desc, id desc)
-// - best returned = getBestKWolves()[0] => "largest among top-3" (delta-like)
-
 struct PairFI { double f; int i; };
 
 __device__ __forceinline__ bool better_smallest(PairFI a, PairFI b) {
-    // a better than b in ascending order
     if (a.f != b.f) return a.f < b.f;
     return a.i < b.i;
 }
 
 __device__ __forceinline__ bool better_largest(PairFI a, PairFI b) {
-    // a better than b in descending order (heap top order)
     if (a.f != b.f) return a.f > b.f;
     return a.i > b.i;
 }
 
 struct Top3Small {
-    PairFI v0, v1, v2; // store 3 smallest (ascending)
+    PairFI v0, v1, v2;
 };
 
 __device__ __forceinline__ void top3small_init(Top3Small& t) {
@@ -209,7 +192,6 @@ __device__ __forceinline__ void top3small_init(Top3Small& t) {
 }
 
 __device__ __forceinline__ void top3small_push(Top3Small& t, PairFI x) {
-    // insert into ascending list v0<=v1<=v2 using better_smallest
     if (better_smallest(x, t.v0)) {
         t.v2 = t.v1;
         t.v1 = t.v0;
@@ -284,30 +266,29 @@ __global__ void reduce_top3_stage2(const PairFI* cand, int N3,
     }
 
     if (tid == 0) {
-        best3_idx_out[0] = sdata[0].v0.i; // alpha (best)
-        best3_idx_out[1] = sdata[0].v1.i; // beta
-        best3_idx_out[2] = sdata[0].v2.i; // delta
+        best3_idx_out[0] = sdata[0].v2.i; // largest among top3
+        best3_idx_out[1] = sdata[0].v1.i;
+        best3_idx_out[2] = sdata[0].v0.i; // smallest among top3
     }
 }
 
-// ===================== Kernel: gather leaders (in OpenMP order) =====================
+// ===================== Kernel: gather leaders =====================
 __global__ void gather_leaders_kernel(const double* pos, int NDIM,
                                       const int* best3_idx,
                                       double* L0, double* L1, double* L2) {
     int d = blockIdx.x * blockDim.x + threadIdx.x;
     if (d >= NDIM) return;
 
-    int i0 = best3_idx[0]; // alpha
-    int i1 = best3_idx[1]; // beta
-    int i2 = best3_idx[2]; // delta
-
+    int i0 = best3_idx[0]; // largest among top3
+    int i1 = best3_idx[1];
+    int i2 = best3_idx[2]; // smallest among top3
 
     L0[d] = pos[(size_t)i0 * NDIM + d];
     L1[d] = pos[(size_t)i1 * NDIM + d];
     L2[d] = pos[(size_t)i2 * NDIM + d];
 }
 
-// ===================== Kernel: update all positions (match OpenMP channels) =====================
+// ===================== Kernel: update all positions =====================
 __global__ void gwo_update_kernel(double* pos, int POP, int NDIM,
                                  const double* L0,
                                  const double* L1,
@@ -353,15 +334,14 @@ __global__ void gwo_update_kernel(double* pos, int POP, int NDIM,
 
 // ===================== Main =====================
 int main() {
-    // Match OpenMP config
-    const int LIMIT_TRAIN = 1000;
+    // Config
+    const int LIMIT_TRAIN = 5000;
     const int K = 10;
     const int RUNS = 1;
     const int MAX_ITERS = 100;
     const uint64_t SEED = 123456789ULL;
 
-    // std::vector<int> Pop_list = {25, 50, 100, 200};
-    std::vector<int> Pop_list = {400, 800};
+    std::vector<int> Pop_list = {32, 64, 128};
 
     MNIST train = load_mnist_images_labels(
         "./mnist/train-images-idx3-ubyte",
@@ -417,7 +397,7 @@ int main() {
         cuda_check(cudaMalloc((void**)&d_L2, bytesVec), "Malloc d_L2");
         cuda_check(cudaMalloc((void**)&d_best3, 3 * sizeof(int)), "Malloc d_best3");
 
-        // init pos (match OpenMP)
+        // init pos 
         {
             int threads = 256;
             int total = POP * NDIM;
@@ -477,8 +457,6 @@ int main() {
 
             cuda_check(cudaDeviceSynchronize(), "sync end run");
 
-            // IMPORTANT: match OpenMP's "best = getBestKWolves()[0]"
-            // In our ordering, best3_idx[0] is "largest among the top3 kept" (delta-like)
             int h_best3[3] = {-1,-1,-1};
             std::vector<double> h_sse(POP);
 

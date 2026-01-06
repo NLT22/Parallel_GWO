@@ -214,7 +214,7 @@ __kernel void reduce_top3_stage1(__global const real* sse,
     }
 }
 
-// stage2: reduce cand to final 3, then output OpenMP order [v2,v1,v0]
+// stage2: reduce cand to final 3
 __kernel void reduce_top3_stage2(__global const PairFI* cand,
                                  int N3,
                                  __global int* best3_out,
@@ -253,12 +253,11 @@ __kernel void reduce_top3_stage2(__global const PairFI* cand,
     }
 
     if (lid == 0) {
-        // s0=smallest (best), s1=2nd, s2=3rd
-        best3_out[0] = s0[0].i; // alpha
-        best3_out[1] = s1[0].i; // beta
-        best3_out[2] = s2[0].i; // delta
+        // s0=smallest, s1=2nd, s2=3rd (largest among top3)
+        best3_out[0] = s2[0].i;
+        best3_out[1] = s1[0].i;
+        best3_out[2] = s0[0].i;
     }
-
 }
 
 __kernel void gather_leaders(__global const real* pos,

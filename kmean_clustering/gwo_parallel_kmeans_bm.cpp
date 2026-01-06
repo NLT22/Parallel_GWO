@@ -125,14 +125,13 @@ struct KMeansProblemCPU_OMP : public GWO::Problem<double> {
 
 int main() {
     // ===================== CONFIG =====================
-    const int LIMIT_TRAIN = 1000; 
+    const int LIMIT_TRAIN = 5000; // tăng lên 60000 nếu muốn nặng hơn
     const int K = 10;
     const int RUNS = 1;
     const int MAX_ITERS = 100;
     const uint64_t SEED = 123456789ULL;
 
-    // std::vector<int> Pop_list = {25, 50, 100, 200};
-    std::vector<int> Pop_list = {400, 800}; 
+    std::vector<int> Pop_list = {32, 64, 128};
     std::vector<int> thread_list = {2, 4, 8, 16, 20};
 
     // ===================== Load MNIST =====================
@@ -191,11 +190,11 @@ int main() {
                 GWO::global_seed = SEED;
                 KMeansProblemCPU_OMP problem(setup, train.X.data(), Ndata, D, K);
 
-                auto st = std::chrono::steady_clock::now();
+                auto t0 = std::chrono::steady_clock::now();
                 auto best = problem.run(MAX_ITERS);
-                auto ed = std::chrono::steady_clock::now();
+                auto t1 = std::chrono::steady_clock::now();
 
-                long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(ed - st).count();
+                long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
                 total_ms += ms;
                 best_last = best.savedFitness;
 
